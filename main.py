@@ -131,8 +131,8 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
     )
     access_token = access_token_response.json().get("access_token")
     response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="Lax")
-    response.set_cookie(key="jwt_token", value=token, httponly=True, secure=True, samesite="Lax")
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="strict")
+    response.set_cookie(key="jwt_token", value=token, httponly=True, secure=True, samesite="strict")
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
