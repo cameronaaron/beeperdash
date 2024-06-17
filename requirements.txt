@@ -3,3 +3,4 @@ pydantic
 Jinja2
 orjson
 asyncio
+email-validator

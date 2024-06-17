@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import httpx
 import asyncio
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 import os
 import logging
 import orjson
@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 class TokenRequest(BaseModel):
     code: str
@@ -97,7 +97,7 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
-async def login(request: Request, email: str = Form(...)):
+async def login(request: Request, email: EmailStr = Form(...)):
     client = app.state.httpx_client
     login_response = await client.post(
         "https://api.beeper.com/user/login",
@@ -131,8 +131,8 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
     )
     access_token = access_token_response.json().get("access_token")
     response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True)
-    response.set_cookie(key="jwt_token", value=token, httponly=True, secure=True)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="Lax")
+    response.set_cookie(key="jwt_token", value=token, httponly=True, secure=True, samesite="Lax")
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
