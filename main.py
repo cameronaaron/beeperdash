@@ -1,11 +1,11 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie
+from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer
 import httpx
+import asyncio
 from pydantic import BaseModel
 import os
-import subprocess
 import logging
 import orjson
 
@@ -64,24 +64,24 @@ GITHUB_REPOS = {
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-def get_latest_github_commit_hash(bridge_name: str) -> str:
+async def get_latest_github_commit_hash(bridge_name: str) -> str:
     repo = GITHUB_REPOS.get(bridge_name, "")
     if not repo:
         return "Unknown"
     
     headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
-    
     branches = ["main", "master"]
-    for branch in branches:
-        github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
-        response = httpx.get(github_url, headers=headers)
-        if response.status_code == 200:
-            latest_commit_hash = response.json().get("sha", "")
-            return latest_commit_hash
-        elif response.status_code == 422:
-            logger.error(f"Invalid repository URL for bridge {bridge_name}: {github_url}")
-        else:
-            logger.error(f"Failed to fetch latest commit for {bridge_name} from {branch} branch: {response.status_code}")
+
+    async with httpx.AsyncClient() as client:
+        for branch in branches:
+            github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+            response = await client.get(github_url, headers=headers)
+            if response.status_code == 200:
+                return response.json().get("sha", "Unknown")
+            elif response.status_code == 422:
+                logger.error(f"Invalid repository URL for bridge {bridge_name}: {github_url}")
+            else:
+                logger.error(f"Failed to fetch latest commit for {bridge_name} from {branch} branch: {response.status_code}")
 
     return "Unknown"
 
@@ -147,14 +147,10 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
         asmux_data = beeper_data.get("user", {}).get("asmuxData", {})
         user_info = beeper_data.get("userInfo", {})
 
-        for bridge_name, bridge_info in bridges.items():
-            if 'version' in bridge_info and bridge_info['version']:
-                current_version = bridge_info['version'].split(':')[-1].split('-')[0]
-                latest_version = get_latest_github_commit_hash(bridge_name)
-                bridge_info['is_up_to_date'] = (current_version == latest_version)
-                logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
-            else:
-                bridge_info['is_up_to_date'] = None
+        bridge_updates = await asyncio.gather(*[
+            update_bridge_info(bridge_name, bridge_info)
+            for bridge_name, bridge_info in bridges.items()
+        ])
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
@@ -166,6 +162,15 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
         "jwt_token": jwt_token,
         "GITHUB_REPOS": GITHUB_REPOS  # Pass GITHUB_REPOS to the template
     })
+
+async def update_bridge_info(bridge_name, bridge_info):
+    if 'version' in bridge_info and bridge_info['version']:
+        current_version = bridge_info['version'].split(':')[-1].split('-')[0]
+        latest_version = await get_latest_github_commit_hash(bridge_name)
+        bridge_info['is_up_to_date'] = (current_version == latest_version)
+        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
+    else:
+        bridge_info['is_up_to_date'] = None
 
 @app.post("/reset_password", response_class=HTMLResponse)
 async def reset_password(request: Request, access_token: str = Form(...), jwt_token: str = Form(...), new_password: str = Form(...)):
