@@ -6,3 +6,4 @@ asyncio
 email-validator
 uvicorn
 httpx
+python-multipart
