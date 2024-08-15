@@ -35,6 +35,12 @@ class CreateBridgeRequest(BaseModel):
     beeper_token: str
     bridge: str
     region: str
+    bridgeType: str = None
+    isSelfHosted: bool = None
+    reason: str = None
+    source: str = None
+    stateEvent: str = None
+    username: str = None
 
 class DeleteBridgeRequest(BaseModel):
     beeper_token: str
@@ -51,6 +57,23 @@ class NotifyUpdateRequest(BaseModel):
 class UserProfile(BaseModel):
     full_name: str
     email: EmailStr
+    analyticsId: str = None
+    bridgeClusterId: str = None
+    channel: str = None
+    createdAt: str = None
+    customerLead: Dict[str, Any] = None
+    dataLocation: str = None
+    deactivatedAt: str = None
+    deletedAt: str = None
+    hungryUrl: str = None
+    hungryUrlDirect: str = None
+    isAdmin: bool = None
+    isFree: bool = None
+    isUserBridgeChangesLocked: bool = None
+    referralCode: str = None
+    supportRoomId: str = None
+    token: str = None
+    username: str = None
 
 GITHUB_REPOS = {
     "discordgo": "mautrix/discord",
@@ -181,6 +204,17 @@ async def update_bridge_info(bridge_name, bridge_info):
         logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
     else:
         bridge_info['is_up_to_date'] = None
+
+    # Process additional fields from the JSON payload
+    if 'remoteState' in bridge_info:
+        for remote_id, remote_info in bridge_info['remoteState'].items():
+            if 'info' in remote_info:
+                remote_info['battery_low'] = remote_info['info'].get('battery_low', None)
+                remote_info['browser_active'] = remote_info['info'].get('browser_active', None)
+                remote_info['google_account_pairing'] = remote_info['info'].get('google_account_pairing', None)
+                remote_info['mobile_data'] = remote_info['info'].get('mobile_data', None)
+                remote_info['settings'] = remote_info['info'].get('settings', None)
+                remote_info['sims'] = remote_info['info'].get('sims', None)
 
 @app.post("/reset_password", response_class=HTMLResponse)
 async def reset_password(request: Request, access_token: str = Form(...), jwt_token: str = Form(...), new_password: str = Form(...)):

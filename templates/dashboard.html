@@ -66,6 +66,34 @@
                 <td>Referral Code</td>
                 <td>{{ user_info.referralCode }}</td>
             </tr>
+            <tr>
+                <td>Data Location</td>
+                <td>{{ user_info.dataLocation }}</td>
+            </tr>
+            <tr>
+                <td>Deactivated At</td>
+                <td>{{ user_info.deactivatedAt }}</td>
+            </tr>
+            <tr>
+                <td>Deleted At</td>
+                <td>{{ user_info.deletedAt }}</td>
+            </tr>
+            <tr>
+                <td>Hungry URL</td>
+                <td>{{ user_info.hungryUrl }}</td>
+            </tr>
+            <tr>
+                <td>Hungry URL Direct</td>
+                <td>{{ user_info.hungryUrlDirect }}</td>
+            </tr>
+            <tr>
+                <td>Is User Bridge Changes Locked</td>
+                <td>{{ user_info.isUserBridgeChangesLocked }}</td>
+            </tr>
+            <tr>
+                <td>Support Room ID</td>
+                <td>{{ user_info.supportRoomId }}</td>
+            </tr>
         </tbody>
     </table>
 
@@ -101,7 +129,13 @@
                         <strong>Has Error:</strong> {{ remote_info.has_error }}<br>
                         <strong>Message:</strong> {{ remote_info.message }}<br>
                         <strong>State Event:</strong> {{ remote_info.state_event }}<br>
-                        <strong>Timestamp:</strong> {{ remote_info.timestamp }}<br><br>
+                        <strong>Timestamp:</strong> {{ remote_info.timestamp }}<br>
+                        <strong>Battery Low:</strong> {{ remote_info.battery_low }}<br>
+                        <strong>Browser Active:</strong> {{ remote_info.browser_active }}<br>
+                        <strong>Google Account Pairing:</strong> {{ remote_info.google_account_pairing }}<br>
+                        <strong>Mobile Data:</strong> {{ remote_info.mobile_data }}<br>
+                        <strong>Settings:</strong> {{ remote_info.settings }}<br>
+                        <strong>Sims:</strong> {{ remote_info.sims }}<br><br>
                     {% endfor %}
                 </td>
                 <td>{{ bridge_data.version.split(':')[-1].split('-')[0] if bridge_data.version else "Unknown" }}</td>
