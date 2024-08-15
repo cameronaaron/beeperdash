@@ -212,28 +212,3 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
     if res_delete_beeper.status_code != 204:
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
     return HTMLResponse(content=f"Bridge {name} deleted successfully")
-
-@app.post("/notify_update", response_class=HTMLResponse)
-async def notify_update(request: Request, environment: str = Form(...), channel: str = Form(...), bridge: str = Form(...), image: str = Form(...), password: str = Form(...), deploy_next: bool = Form(...)):
-    try:
-        url = os.getenv(f"BEEPER_{environment}_ADMIN_API_URL")
-        if not url:
-            raise ValueError(f"Environment variable for {environment} admin API URL not set")
-        
-        headers = {"Content-Type": "application/json"}
-        data = {
-            "channel": channel,
-            "bridge": bridge,
-            "image": image,
-            "password": password,
-            "deployNext": deploy_next
-        }
-        
-        client = app.state.httpx_client
-        response = await client.post(url, headers=headers, json=data)
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=f"Failed to notify update: {response.text}")
-        
-        return HTMLResponse(content="Update notification sent successfully")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
