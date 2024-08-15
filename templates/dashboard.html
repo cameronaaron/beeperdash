@@ -268,11 +268,18 @@ $(document).ready(function() {
         console.log("WebSocket closed: ", event);
     };
 
-    // Simulate receiving notifications
-    setInterval(function() {
-        const notification = `<li class="list-group-item">New notification at ${new Date().toLocaleTimeString()}</li>`;
-        $('#notifications-list').append(notification);
-    }, 5000);
+    // WebSocket for real-time notifications
+    const notificationsSocket = new WebSocket("{{ ws_notifications_url }}");
+
+    notificationsSocket.onmessage = function(event) {
+        const notification = JSON.parse(event.data);
+        const notificationItem = `<li class="list-group-item">${notification.issue_type}: ${notification.issue_description}</li>`;
+        $('#notifications-list').append(notificationItem);
+    };
+
+    notificationsSocket.onclose = function(event) {
+        console.log("WebSocket closed: ", event);
+    };
 });
 </script>
 </body>

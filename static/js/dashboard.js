@@ -12,9 +12,16 @@ document.addEventListener("DOMContentLoaded", function() {
         console.log("WebSocket closed: ", event);
     };
 
-    // Simulate receiving notifications
-    setInterval(function() {
-        const notification = `<li class="list-group-item">New notification at ${new Date().toLocaleTimeString()}</li>`;
-        document.getElementById("notifications-list").insertAdjacentHTML('beforeend', notification);
-    }, 5000);
+    // WebSocket for real-time notifications
+    const notificationsSocket = new WebSocket("ws://localhost:8000/ws/notifications");
+
+    notificationsSocket.onmessage = function(event) {
+        const notification = JSON.parse(event.data);
+        const notificationItem = `<li class="list-group-item">${notification.issue_type}: ${notification.issue_description}</li>`;
+        document.getElementById("notifications-list").insertAdjacentHTML('beforeend', notificationItem);
+    };
+
+    notificationsSocket.onclose = function(event) {
+        console.log("WebSocket closed: ", event);
+    };
 });

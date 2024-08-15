@@ -53,6 +53,8 @@ class NotifyUpdateRequest(BaseModel):
     image: str
     password: str
     deploy_next: bool = False
+    issue_type: str = None
+    issue_description: str = None
 
 class UserProfile(BaseModel):
     full_name: str
@@ -95,6 +97,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 @app.on_event("startup")
 async def startup_event():
     app.state.httpx_client = httpx.AsyncClient()
+    app.state.notification_clients = []
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -201,7 +204,8 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
         "asmux_data": asmux_data,
         "user_info": user_info,
         "jwt_token": jwt_token,
-        "GITHUB_REPOS": GITHUB_REPOS  # Pass GITHUB_REPOS to the template
+        "GITHUB_REPOS": GITHUB_REPOS,  # Pass GITHUB_REPOS to the template
+        "ws_notifications_url": "ws://localhost:8000/ws/notifications"  # WebSocket URL for notifications
     })
 
 async def update_bridge_info(bridge_name, bridge_info):
@@ -305,6 +309,17 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
 
+@app.websocket("/ws/notifications")
+async def websocket_notifications(websocket: WebSocket):
+    await websocket.accept()
+    app.state.notification_clients.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        app.state.notification_clients.remove(websocket)
+        logger.info("WebSocket disconnected")
+
 async def get_bridge_status(bridge_name: str) -> Dict[str, Any]:
     # Simulate fetching bridge status
     await asyncio.sleep(1)
@@ -314,4 +329,19 @@ async def get_bridge_status(bridge_name: str) -> Dict[str, Any]:
 async def notify_update(request: NotifyUpdateRequest):
     # Simulate sending a notification
     logger.info(f"Notification sent for bridge: {request.bridge}")
+    notification = {
+        "environment": request.environment,
+        "channel": request.channel,
+        "bridge": request.bridge,
+        "image": request.image,
+        "password": request.password,
+        "deploy_next": request.deploy_next,
+        "issue_type": request.issue_type,
+        "issue_description": request.issue_description
+    }
+    await broadcast_notification(notification)
     return JSONResponse(content={"message": "Notification sent successfully"})
+
+async def broadcast_notification(notification: Dict[str, Any]):
+    for client in app.state.notification_clients:
+        await client.send_json(notification)
