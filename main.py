@@ -120,6 +120,13 @@ async def get_latest_github_commit_hash(bridge_name: str) -> str:
 
     return "Unknown"
 
+def save_tokens_to_cookies(response: RedirectResponse, access_token: str, jwt_token: str):
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="strict")
+    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True, secure=True, samesite="strict")
+
+def retrieve_tokens_from_cookies(access_token: str, jwt_token: str):
+    return access_token, jwt_token
+
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
@@ -159,14 +166,15 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
     )
     access_token = access_token_response.json().get("access_token")
     response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="strict")
-    response.set_cookie(key="jwt_token", value=token, httponly=True, secure=True, samesite="strict")
+    save_tokens_to_cookies(response, access_token, token)
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, access_token: str = Cookie(None), jwt_token: str = Cookie(None)):
     if not access_token or not jwt_token:
-        return RedirectResponse(url="/", status_code=302)
+        access_token, jwt_token = retrieve_tokens_from_cookies(access_token, jwt_token)
+        if not access_token or not jwt_token:
+            return RedirectResponse(url="/", status_code=302)
 
     client = app.state.httpx_client
     beeper_response = await client.get(
@@ -255,7 +263,9 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
 @app.get("/profile", response_class=HTMLResponse)
 async def get_profile(request: Request, access_token: str = Cookie(None)):
     if not access_token:
-        return RedirectResponse(url="/", status_code=302)
+        access_token, _ = retrieve_tokens_from_cookies(access_token, None)
+        if not access_token:
+            return RedirectResponse(url="/", status_code=302)
 
     client = app.state.httpx_client
     profile_response = await client.get(
@@ -270,7 +280,9 @@ async def get_profile(request: Request, access_token: str = Cookie(None)):
 @app.post("/profile", response_class=HTMLResponse)
 async def update_profile(request: Request, access_token: str = Cookie(None), full_name: str = Form(...), email: EmailStr = Form(...)):
     if not access_token:
-        return RedirectResponse(url="/", status_code=302)
+        access_token, _ = retrieve_tokens_from_cookies(access_token, None)
+        if not access_token:
+            return RedirectResponse(url="/", status_code=302)
 
     client = app.state.httpx_client
     update_response = await client.put(
