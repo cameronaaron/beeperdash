@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import httpx
@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr
 import os
 import logging
 import orjson
+from typing import List, Dict, Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,10 @@ class NotifyUpdateRequest(BaseModel):
     image: str
     password: str
     deploy_next: bool = False
+
+class UserProfile(BaseModel):
+    full_name: str
+    email: EmailStr
 
 GITHUB_REPOS = {
     "discordgo": "mautrix/discord",
@@ -212,3 +217,55 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
     if res_delete_beeper.status_code != 204:
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
     return HTMLResponse(content=f"Bridge {name} deleted successfully")
+
+@app.get("/profile", response_class=HTMLResponse)
+async def get_profile(request: Request, access_token: str = Cookie(None)):
+    if not access_token:
+        return RedirectResponse(url="/", status_code=302)
+
+    client = app.state.httpx_client
+    profile_response = await client.get(
+        "https://api.beeper.com/user/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if profile_response.status_code != 200:
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch profile data"})
+    profile_data = profile_response.json()
+    return templates.TemplateResponse("profile.html", {"request": request, "profile": profile_data})
+
+@app.post("/profile", response_class=HTMLResponse)
+async def update_profile(request: Request, access_token: str = Cookie(None), full_name: str = Form(...), email: EmailStr = Form(...)):
+    if not access_token:
+        return RedirectResponse(url="/", status_code=302)
+
+    client = app.state.httpx_client
+    update_response = await client.put(
+        "https://api.beeper.com/user/profile",
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        json={"full_name": full_name, "email": email},
+    )
+    if update_response.status_code != 200:
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to update profile data"})
+    return RedirectResponse(url="/profile", status_code=303)
+
+@app.websocket("/ws/bridge_status")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            bridge_status = await get_bridge_status(data)
+            await websocket.send_json(bridge_status)
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+
+async def get_bridge_status(bridge_name: str) -> Dict[str, Any]:
+    # Simulate fetching bridge status
+    await asyncio.sleep(1)
+    return {"bridge_name": bridge_name, "status": "active"}
+
+@app.post("/notify_update", response_class=JSONResponse)
+async def notify_update(request: NotifyUpdateRequest):
+    # Simulate sending a notification
+    logger.info(f"Notification sent for bridge: {request.bridge}")
+    return JSONResponse(content={"message": "Notification sent successfully"})

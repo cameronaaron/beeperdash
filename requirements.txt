@@ -7,3 +7,6 @@ email-validator
 uvicorn
 httpx
 python-multipart
+websockets
+pydantic[email]
+python-dotenv

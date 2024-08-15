@@ -1,0 +1,112 @@
+/* Custom CSS for improved styling and user experience */
+
+/* General Styles */
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-control {
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    border-radius: 5px;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+/* Table Styles */
+.table {
+    margin-top: 20px;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.table th, .table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.table th {
+    background-color: #f1f1f1;
+}
+
+.table-bordered {
+    border: 1px solid #dee2e6;
+}
+
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dee2e6;
+}
+
+/* Badge Styles */
+.badge {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.badge-success {
+    background-color: #28a745;
+}
+
+.badge-danger {
+    background-color: #dc3545;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+}
+
+/* Tooltip Styles */
+.tooltip-inner {
+    background-color: #333;
+    color: #fff;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+
+/* Modal Styles */
+.modal-content {
+    border-radius: 10px;
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* Custom Styles for Dashboard */
+#bridge-status-container, #notifications-container {
+    margin-top: 20px;
+}
+
+.list-group-item {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}

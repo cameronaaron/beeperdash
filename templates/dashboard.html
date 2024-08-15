@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beeper Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="/static/css/custom.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://unpkg.com/@popperjs/core@2/dist/umd/popper.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="/static/js/dashboard.js"></script>
 </head>
 <body>
 <div class="container">
@@ -161,8 +163,83 @@
         <button type="submit" class="btn btn-primary">Delete Bridge</button>
     </form>
 
-    
-    
+    <!-- User Profile Management Section -->
+    <h2 class="mt-5">User Profile Management</h2>
+    <h3>Update Profile</h3>
+    <p>Use this form to update your profile information.</p>
+    <form method="post" action="/profile">
+        <div class="form-group">
+            <label for="full_name">Full Name:</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user_info.fullName }}" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ user_info.email }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Profile</button>
+    </form>
+
+    <!-- Real-time Bridge Status Section -->
+    <h2 class="mt-5">Real-time Bridge Status</h2>
+    <p>Monitor the status of your bridges in real-time.</p>
+    <div id="bridge-status-container">
+        <ul id="bridge-status-list" class="list-group">
+            <!-- Real-time bridge status updates will be appended here -->
+        </ul>
+    </div>
+
+    <!-- Notifications Section -->
+    <h2 class="mt-5">Notifications</h2>
+    <p>Receive notifications for bridge updates and errors.</p>
+    <div id="notifications-container">
+        <ul id="notifications-list" class="list-group">
+            <!-- Notifications will be appended here -->
+        </ul>
+    </div>
 </div>
+
+<!-- Tooltip and Modal -->
+<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="infoModalLabel">Dashboard Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                This dashboard provides an overview of your Beeper account, bridges, and real-time updates.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Tooltip initialization
+    $('[data-toggle="tooltip"]').tooltip();
+
+    // WebSocket for real-time bridge status updates
+    const bridgeStatusSocket = new WebSocket("ws://localhost:8000/ws/bridge_status");
+
+    bridgeStatusSocket.onmessage = function(event) {
+        const bridgeStatus = JSON.parse(event.data);
+        const bridgeStatusItem = `<li class="list-group-item">${bridgeStatus.bridge_name}: ${bridgeStatus.status}</li>`;
+        $('#bridge-status-list').append(bridgeStatusItem);
+    };
+
+    bridgeStatusSocket.onclose = function(event) {
+        console.log("WebSocket closed: ", event);
+    };
+
+    // Simulate receiving notifications
+    setInterval(function() {
+        const notification = `<li class="list-group-item">New notification at ${new Date().toLocaleTimeString()}</li>`;
+        $('#notifications-list').append(notification);
+    }, 5000);
+});
+</script>
 </body>
 </html>
