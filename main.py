@@ -324,24 +324,3 @@ async def get_bridge_status(bridge_name: str) -> Dict[str, Any]:
     # Simulate fetching bridge status
     await asyncio.sleep(1)
     return {"bridge_name": bridge_name, "status": "active"}
-
-@app.post("/notify_update", response_class=JSONResponse)
-async def notify_update(request: NotifyUpdateRequest):
-    # Simulate sending a notification
-    logger.info(f"Notification sent for bridge: {request.bridge}")
-    notification = {
-        "environment": request.environment,
-        "channel": request.channel,
-        "bridge": request.bridge,
-        "image": request.image,
-        "password": request.password,
-        "deploy_next": request.deploy_next,
-        "issue_type": request.issue_type,
-        "issue_description": request.issue_description
-    }
-    await broadcast_notification(notification)
-    return JSONResponse(content={"message": "Notification sent successfully"})
-
-async def broadcast_notification(notification: Dict[str, Any]):
-    for client in app.state.notification_clients:
-        await client.send_json(notification)
