@@ -61,7 +61,7 @@ $(document).ready(function() {
     });
 
     function validateCode(code) {
-        var re = /^[0-9]{6}$/;
+        var re = /^\d{3}\s?\d{3}$/;
         return re.test(code);
     }
 });

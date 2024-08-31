@@ -215,25 +215,7 @@
         <button type="submit" class="btn btn-primary">Update Profile</button>
     </form>
 
-    <!-- Real-time Bridge Status Section -->
-    <h2 class="mt-5">Real-time Bridge Status</h2>
-    <p>Monitor the status of your bridges in real-time.</p>
-    <div id="bridge-status-container">
-        <ul id="bridge-status-list" class="list-group">
-            <!-- Real-time bridge status updates will be appended here -->
-        </ul>
-    </div>
-
-    <!-- Notifications Section -->
-    <h2 class="mt-5">Notifications</h2>
-    <p>Receive notifications for bridge updates and errors.</p>
-    <div id="notifications-container">
-        <ul id="notifications-list" class="list-group">
-            <!-- Notifications will be appended here -->
-        </ul>
-    </div>
-</div>
-
+    
 <!-- Tooltip and Modal -->
 <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -257,31 +239,6 @@ $(document).ready(function() {
     // Tooltip initialization
     $('[data-toggle="tooltip"]').tooltip();
 
-    // WebSocket for real-time bridge status updates
-    const bridgeStatusSocket = new WebSocket("ws://localhost:8000/ws/bridge_status");
-
-    bridgeStatusSocket.onmessage = function(event) {
-        const bridgeStatus = JSON.parse(event.data);
-        const bridgeStatusItem = `<li class="list-group-item">${bridgeStatus.bridge_name}: ${bridgeStatus.status}</li>`;
-        $('#bridge-status-list').append(bridgeStatusItem);
-    };
-
-    bridgeStatusSocket.onclose = function(event) {
-        console.log("WebSocket closed: ", event);
-    };
-
-    // WebSocket for real-time notifications
-    const notificationsSocket = new WebSocket("{{ ws_notifications_url }}");
-
-    notificationsSocket.onmessage = function(event) {
-        const notification = JSON.parse(event.data);
-        const notificationItem = `<li class="list-group-item">${notification.issue_type}: ${notification.issue_description}</li>`;
-        $('#notifications-list').append(notificationItem);
-    };
-
-    notificationsSocket.onclose = function(event) {
-        console.log("WebSocket closed: ", event);
-    };
 });
 </script>
 </body>

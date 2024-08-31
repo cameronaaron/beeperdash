@@ -46,15 +46,6 @@ class DeleteBridgeRequest(BaseModel):
     beeper_token: str
     name: str
 
-class NotifyUpdateRequest(BaseModel):
-    environment: str
-    channel: str
-    bridge: str
-    image: str
-    password: str
-    deploy_next: bool = False
-    issue_type: str = None
-    issue_description: str = None
 
 class UserProfile(BaseModel):
     full_name: str
@@ -308,30 +299,3 @@ async def update_profile(request: Request, access_token: str = Cookie(None), ful
     if update_response.status_code != 200:
         return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to update profile data"})
     return RedirectResponse(url="/profile", status_code=303)
-
-@app.websocket("/ws/bridge_status")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            bridge_status = await get_bridge_status(data)
-            await websocket.send_json(bridge_status)
-    except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-
-@app.websocket("/ws/notifications")
-async def websocket_notifications(websocket: WebSocket):
-    await websocket.accept()
-    app.state.notification_clients.append(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        app.state.notification_clients.remove(websocket)
-        logger.info("WebSocket disconnected")
-
-async def get_bridge_status(bridge_name: str) -> Dict[str, Any]:
-    # Simulate fetching bridge status
-    await asyncio.sleep(1)
-    return {"bridge_name": bridge_name, "status": "active"}
