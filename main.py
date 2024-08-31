@@ -187,8 +187,13 @@ async def update_bridge_info(bridge_name, bridge_info):
                 remote_info['settings'] = remote_info['info'].get('settings', None)
                 remote_info['sims'] = remote_info['info'].get('sims', None)
 
+def is_authenticated(access_token: str, jwt_token: str) -> bool:
+    return bool(access_token and jwt_token)
+
 @app.get("/", response_class=HTMLResponse)
-async def login_page(request: Request):
+async def login_page(request: Request, access_token: str = Cookie(None), jwt_token: str = Cookie(None)):
+    if is_authenticated(access_token, jwt_token):
+        return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
