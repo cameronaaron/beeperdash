@@ -309,9 +309,26 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
     try:
         res_delete_beeper = await client.delete(
             f"https://api.beeper.com/bridge/{name}",
-            headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"}
+            headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
+            timeout=10.0  # Set a timeout of 10 seconds
         )
         res_delete_beeper.raise_for_status()
+    except httpx.ReadTimeout:
+        logger.error("Request to delete bridge timed out.")
+        # Check if the bridge still exists
+        try:
+            res_check_bridge = await client.get(
+                f"https://api.beeper.com/bridge/{name}",
+                headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
+                timeout=10.0  # Set a timeout of 10 seconds
+            )
+            if res_check_bridge.status_code == 404:
+                return HTMLResponse(content=f"Bridge {name} deleted successfully (timeout occurred but bridge no longer exists).")
+            else:
+                return HTMLResponse(content="Request to delete bridge timed out. Please try again later.", status_code=500)
+        except httpx.HTTPStatusError as exc:
+            logger.error(f"Error checking bridge existence: {exc.response.status_code}")
+            return HTMLResponse(content="Failed to verify bridge deletion status.", status_code=500)
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error deleting bridge: {exc.response.status_code}")
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
