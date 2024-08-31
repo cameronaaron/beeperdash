@@ -152,8 +152,10 @@
                         <span class="badge bg-secondary">Unknown</span>
                     {% endif %}
                 </td>
-                <td>{{ bridge_data.latest_commit_date }}</td>
+                
                 <td>{{ bridge_data.current_commit_date }}</td> <!-- Add this cell -->
+                <td>{{ bridge_data.latest_commit_date }}</td>
+
             </tr>
         {% endfor %}
         </tbody>
