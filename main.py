@@ -270,7 +270,6 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
         "user_info": user_info,
         "jwt_token": jwt_token,
         "GITHUB_REPOS": GITHUB_REPOS,  # Pass GITHUB_REPOS to the template
-        "ws_notifications_url": "ws://localhost:8000/ws/notifications"  # WebSocket URL for notifications
     })
 
 @app.post("/reset_password", response_class=HTMLResponse)
