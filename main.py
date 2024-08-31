@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends, WebS
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import Response
 import httpx
 import asyncio
 from pydantic import BaseModel, EmailStr
@@ -9,6 +10,7 @@ import os
 import logging
 import orjson
 from typing import List, Dict, Any
+from fastapi.staticfiles import StaticFiles
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,7 +47,6 @@ class CreateBridgeRequest(BaseModel):
 class DeleteBridgeRequest(BaseModel):
     beeper_token: str
     name: str
-
 
 class UserProfile(BaseModel):
     full_name: str
@@ -90,37 +91,97 @@ async def startup_event():
     app.state.httpx_client = httpx.AsyncClient()
     app.state.notification_clients = []
 
+def save_tokens_to_cookies(response: Response, access_token: str, jwt_token: str):
+    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True)
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.httpx_client.aclose()
+# Mount the static directory
+#app.mount("/static", StaticFiles(directory="static"), name="static")
+async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+    github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+    try:
+        response = await app.state.httpx_client.get(github_url, headers=headers)
+        response.raise_for_status()
+        commit_data = response.json()
+        return {
+            "sha": commit_data.get("sha", "Unknown"),
+            "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
+            "message": commit_data.get("commit", {}).get("message", "No commit message")
+        }
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error fetching commit data from {github_url}: {exc.response.status_code}")
+        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
 
 async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
     repo = GITHUB_REPOS.get(bridge_name, "")
     if not repo:
-        return {"sha": "Unknown", "date": "Unknown"}
+        return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
     
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
     branches = ["main", "master"]
-
     for branch in branches:
-        github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+        commit_data = await get_github_commit_data(repo, branch)
+        if commit_data["sha"] != "Unknown":
+            return commit_data
+
+    return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
+
+async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]:
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+    github_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash}"
+    try:
         response = await app.state.httpx_client.get(github_url, headers=headers)
-        if response.status_code == 200:
-            commit_data = response.json()
-            return {"sha": commit_data.get("sha", "Unknown"), "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown")}
-        elif response.status_code == 422:
-            logger.error(f"Invalid repository URL for bridge {bridge_name}: {github_url}")
-        else:
-            logger.error(f"Failed to fetch latest commit for {bridge_name} from {branch} branch: {response.status_code}")
+        response.raise_for_status()
+        commit_data = response.json()
+        return {
+            "sha": commit_data.get("sha", "Unknown"),
+            "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
+            "message": commit_data.get("commit", {}).get("message", "No commit message")
+        }
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error fetching commit data from {github_url}: {exc.response.status_code}")
+        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
 
-    return {"sha": "Unknown", "date": "Unknown"}
+async def update_bridge_info(bridge_name, bridge_info):
+    if 'version' in bridge_info and bridge_info['version']:
+        current_version = bridge_info['version'].split(':')[-1].split('-')[0]
+        latest_commit = await get_latest_github_commit_hash(bridge_name)
+        latest_version = latest_commit["sha"]
+        latest_date = latest_commit["date"]
+        latest_message = latest_commit["message"]
+        
+        current_commit = await get_commit_data_by_hash(GITHUB_REPOS[bridge_name], current_version)
+        current_date = current_commit["date"]
+        current_message = current_commit["message"]
 
-def save_tokens_to_cookies(response: RedirectResponse, access_token: str, jwt_token: str):
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="strict")
-    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True, secure=True, samesite="strict")
+        bridge_info['is_up_to_date'] = (current_version == latest_version)
+        bridge_info['latest_commit_date'] = latest_date
+        bridge_info['latest_version'] = latest_version
+        bridge_info['latest_commit_message'] = latest_message
+        bridge_info['current_commit_date'] = current_date  # Add current commit date
+        bridge_info['current_commit_message'] = current_message
 
-def retrieve_tokens_from_cookies(access_token: str, jwt_token: str):
-    return access_token, jwt_token
+        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}, Latest commit date: {latest_date}, Current commit date: {current_date}")
+    else:
+        bridge_info['is_up_to_date'] = None
+        bridge_info['latest_commit_date'] = "Unknown"
+        bridge_info['latest_version'] = "Unknown"
+        bridge_info['latest_commit_message'] = "Unknown"
+        bridge_info['current_commit_date'] = "Unknown"  # Add current commit date
+        bridge_info['current_commit_message'] = "Unknown"
+
+    # Process additional fields from the JSON payload
+    if 'remoteState' in bridge_info:
+        for remote_id, remote_info in bridge_info['remoteState'].items():
+            if 'info' in remote_info:
+                remote_info['battery_low'] = remote_info['info'].get('battery_low', None)
+                remote_info['browser_active'] = remote_info['info'].get('browser_active', None)
+                remote_info['google_account_pairing'] = remote_info['info'].get('google_account_pairing', None)
+                remote_info['mobile_data'] = remote_info['info'].get('mobile_data', None)
+                remote_info['settings'] = remote_info['info'].get('settings', None)
+                remote_info['sims'] = remote_info['info'].get('sims', None)
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -129,18 +190,24 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: EmailStr = Form(...)):
     client = app.state.httpx_client
-    login_response = await client.post(
-        "https://api.beeper.com/user/login",
-        headers={"Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE"},
-    )
-    request_data = login_response.json().get("request")
-    await client.post(
-        "https://api.beeper.com/user/login/email",
-        headers={
-            "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
-            "Content-Type": "application/json"},
-        json={"request": request_data, "email": email},
-    )
+    try:
+        login_response = await client.post(
+            "https://api.beeper.com/user/login",
+            headers={"Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE"},
+        )
+        login_response.raise_for_status()
+        request_data = login_response.json().get("request")
+        await client.post(
+            "https://api.beeper.com/user/login/email",
+            headers={
+                "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
+                "Content-Type": "application/json"},
+            json={"request": request_data, "email": email},
+        )
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error during login: {exc.response.status_code}")
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Login failed"})
+    
     return templates.TemplateResponse("code.html", {"request": request, "login_request": request_data})
 
 @app.post("/token")
@@ -206,64 +273,50 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
         "ws_notifications_url": "ws://localhost:8000/ws/notifications"  # WebSocket URL for notifications
     })
 
-async def update_bridge_info(bridge_name, bridge_info):
-    if 'version' in bridge_info and bridge_info['version']:
-        current_version = bridge_info['version'].split(':')[-1].split('-')[0]
-        latest_commit = await get_latest_github_commit_hash(bridge_name)
-        latest_version = latest_commit["sha"]
-        latest_date = latest_commit["date"]
-        bridge_info['is_up_to_date'] = (current_version == latest_version)
-        bridge_info['latest_commit_date'] = latest_date
-        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}, Latest commit date: {latest_date}")
-    else:
-        bridge_info['is_up_to_date'] = None
-        bridge_info['latest_commit_date'] = "Unknown"
-
-    # Process additional fields from the JSON payload
-    if 'remoteState' in bridge_info:
-        for remote_id, remote_info in bridge_info['remoteState'].items():
-            if 'info' in remote_info:
-                remote_info['battery_low'] = remote_info['info'].get('battery_low', None)
-                remote_info['browser_active'] = remote_info['info'].get('browser_active', None)
-                remote_info['google_account_pairing'] = remote_info['info'].get('google_account_pairing', None)
-                remote_info['mobile_data'] = remote_info['info'].get('mobile_data', None)
-                remote_info['settings'] = remote_info['info'].get('settings', None)
-                remote_info['sims'] = remote_info['info'].get('sims', None)
-
 @app.post("/reset_password", response_class=HTMLResponse)
 async def reset_password(request: Request, access_token: str = Form(...), jwt_token: str = Form(...), new_password: str = Form(...)):
     client = app.state.httpx_client
-    user_interactive_auth_response = await client.post(
-        "https://matrix.beeper.com/_matrix/client/v3/account/password",
-        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={}
-    )
-    session_data = user_interactive_auth_response.json()
-    session = session_data["session"]
-    await client.post(
-        "https://matrix.beeper.com/_matrix/client/v3/account/password",
-        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={
-            "auth": {
-                "type": "org.matrix.login.jwt",
-                "token": jwt_token,
-                "session": session,
-            },
-            "new_password": new_password,
-            "logout_devices": False,
-        }
-    )
+    try:
+        user_interactive_auth_response = await client.post(
+            "https://matrix.beeper.com/_matrix/client/v3/account/password",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            json={}
+        )
+        user_interactive_auth_response.raise_for_status()
+        session_data = user_interactive_auth_response.json()
+        session = session_data["session"]
+        await client.post(
+            "https://matrix.beeper.com/_matrix/client/v3/account/password",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            json={
+                "auth": {
+                    "type": "org.matrix.login.jwt",
+                    "token": jwt_token,
+                    "session": session,
+                },
+                "new_password": new_password,
+                "logout_devices": False,
+            }
+        )
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error resetting password: {exc.response.status_code}")
+        return HTMLResponse(content="Failed to reset password", status_code=500)
+    
     return HTMLResponse(content="Password reset successfully")
 
 @app.post("/delete_bridge", response_class=HTMLResponse)
 async def delete_bridge(request: Request, beeper_token: str = Form(...), name: str = Form(...)):
     client = app.state.httpx_client
-    res_delete_beeper = await client.delete(
-        f"https://api.beeper.com/bridge/{name}",
-        headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"}
-    )
-    if res_delete_beeper.status_code != 204:
+    try:
+        res_delete_beeper = await client.delete(
+            f"https://api.beeper.com/bridge/{name}",
+            headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"}
+        )
+        res_delete_beeper.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error deleting bridge: {exc.response.status_code}")
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
+    
     return HTMLResponse(content=f"Bridge {name} deleted successfully")
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -291,11 +344,15 @@ async def update_profile(request: Request, access_token: str = Cookie(None), ful
             return RedirectResponse(url="/", status_code=302)
 
     client = app.state.httpx_client
-    update_response = await client.put(
-        "https://api.beeper.com/user/profile",
-        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={"full_name": full_name, "email": email},
-    )
-    if update_response.status_code != 200:
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to update profile data"})
-    return RedirectResponse(url="/profile", status_code=303)
+    try:
+        update_response = await client.put(
+            "https://api.beeper.com/user/profile",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            json={"full_name": full_name, "email": email},
+        )
+        if update_response.status_code != 200:
+            return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to update profile data"})
+        return RedirectResponse(url="/profile", status_code=303)
+    except Exception as e:
+        logger.error(f"An error occurred while updating profile data: {e}")
+        return templates.TemplateResponse("error.html", {"request": request, "error": "An unexpected error occurred"})

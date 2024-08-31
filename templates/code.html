@@ -51,17 +51,18 @@ $(document).ready(function() {
     });
 
     $('form').on('submit', function(event) {
-        var code = $('#code').val();
+        var code = $('#code').val().replace(/\s+/g, ''); // Remove all whitespace
         if (!validateCode(code)) {
             event.preventDefault();
             $('#code').addClass('is-invalid');
         } else {
+            $('#code').val(code); // Update the input value without spaces
             $('#code').removeClass('is-invalid');
         }
     });
 
     function validateCode(code) {
-        var re = /^\d{3}\s?\d{3}$/;
+        var re = /^\d{6}$/; // Adjusted regex to match exactly 6 digits
         return re.test(code);
     }
 });

@@ -109,7 +109,7 @@
                 <th>Remote State</th>
                 <th>Version</th>
                 <th>Up-to-Date</th>
-                <th>Latest Commit Hash</th>
+                <th>Current Commit Date</th>
                 <th>Latest Commit Date</th>
             </tr>
         </thead>
@@ -154,6 +154,7 @@
                 </td>
                 <td>{{ bridge_data.latest_commit_hash }}</td>
                 <td>{{ bridge_data.latest_commit_date }}</td>
+                <td>{{ bridge_data.current_commit_date }}</td> <!-- Add this cell -->
             </tr>
         {% endfor %}
         </tbody>
