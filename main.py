@@ -335,6 +335,25 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
     
     return HTMLResponse(content=f"Bridge {name} deleted successfully")
 
+@app.post("/start_or_update_bridge", response_class=HTMLResponse)
+async def start_or_update_bridge(request: Request, beeper_token: str = Form(...), name: str = Form(...)):
+    client = app.state.httpx_client
+    try:
+        res_start_update_beeper = await client.post(
+            f"https://api.beeper.com/bridge/{name}/start",
+            headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
+            timeout=10.0  # Set a timeout of 10 seconds
+        )
+        res_start_update_beeper.raise_for_status()
+    except httpx.ReadTimeout:
+        logger.error("Request to start or update bridge timed out.")
+        return HTMLResponse(content="Request to start or update bridge timed out. Please try again later.", status_code=500)
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error starting or updating bridge: {exc.response.status_code}")
+        return HTMLResponse(content="Failed to start or update bridge on Beeper", status_code=500)
+    
+    return HTMLResponse(content=f"Bridge {name} started or updated successfully")
+
 @app.get("/profile", response_class=HTMLResponse)
 async def get_profile(request: Request, access_token: str = Cookie(None)):
     if not access_token:

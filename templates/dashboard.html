@@ -201,6 +201,23 @@
         <button type="submit" class="btn btn-primary">Delete Bridge</button>
     </form>
 
+    <!-- Start or Update Bridge Form -->
+    <form method="post" action="/start_or_update_bridge">
+        <div class="form-group">
+            <label for="beeper_token">Beeper Token:</label>
+            <input type="text" class="form-control" id="beeper_token" name="beeper_token" value="{{ token }}" required>
+        </div>
+        <div class="form-group">
+            <label for="bridge">Bridge:</label>
+            <select id="bridge" name="name" class="form-control" required>
+                {% for bridge in GITHUB_REPOS.keys() %}
+                <option value="{{ bridge }}">{{ bridge }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Start or Update Bridge</button>
+    </form>
+
     <!-- User Profile Management Section -->
     <h2 class="mt-5">User Profile Management</h2>
     <h3>Update Profile</h3>
