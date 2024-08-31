@@ -103,10 +103,10 @@ async def startup_event():
 async def shutdown_event():
     await app.state.httpx_client.aclose()
 
-async def get_latest_github_commit_hash(bridge_name: str) -> str:
+async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
     repo = GITHUB_REPOS.get(bridge_name, "")
     if not repo:
-        return "Unknown"
+        return {"sha": "Unknown", "date": "Unknown"}
     
     headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
     branches = ["main", "master"]
@@ -115,13 +115,14 @@ async def get_latest_github_commit_hash(bridge_name: str) -> str:
         github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
         response = await app.state.httpx_client.get(github_url, headers=headers)
         if response.status_code == 200:
-            return response.json().get("sha", "Unknown")
+            commit_data = response.json()
+            return {"sha": commit_data.get("sha", "Unknown"), "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown")}
         elif response.status_code == 422:
             logger.error(f"Invalid repository URL for bridge {bridge_name}: {github_url}")
         else:
             logger.error(f"Failed to fetch latest commit for {bridge_name} from {branch} branch: {response.status_code}")
 
-    return "Unknown"
+    return {"sha": "Unknown", "date": "Unknown"}
 
 def save_tokens_to_cookies(response: RedirectResponse, access_token: str, jwt_token: str):
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="strict")
@@ -154,13 +155,19 @@ async def login(request: Request, email: EmailStr = Form(...)):
 @app.post("/token")
 async def get_token(request: Request, code: str = Form(...), login_request: str = Form(...)):
     client = app.state.httpx_client
-    login_challenge_response = await client.post(
-        "https://api.beeper.com/user/login/response",
-        headers={
-            "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
-            "Content-Type": "application/json"},
-        json={"request": login_request, "response": code},
-    )
+    try:
+        login_challenge_response = await client.post(
+            "https://api.beeper.com/user/login/response",
+            headers={
+                "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
+                "Content-Type": "application/json"},
+            json={"request": login_request, "response": code},
+        )
+        login_challenge_response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"Error response {exc.response.status_code} while requesting {exc.request.url!r}.")
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Invalid token"})
+    
     token = login_challenge_response.json().get("token")
     access_token_response = await client.post(
         "https://matrix.beeper.com/_matrix/client/v3/login",
@@ -211,11 +218,15 @@ async def dashboard(request: Request, access_token: str = Cookie(None), jwt_toke
 async def update_bridge_info(bridge_name, bridge_info):
     if 'version' in bridge_info and bridge_info['version']:
         current_version = bridge_info['version'].split(':')[-1].split('-')[0]
-        latest_version = await get_latest_github_commit_hash(bridge_name)
+        latest_commit = await get_latest_github_commit_hash(bridge_name)
+        latest_version = latest_commit["sha"]
+        latest_date = latest_commit["date"]
         bridge_info['is_up_to_date'] = (current_version == latest_version)
-        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
+        bridge_info['latest_commit_date'] = latest_date
+        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}, Latest commit date: {latest_date}")
     else:
         bridge_info['is_up_to_date'] = None
+        bridge_info['latest_commit_date'] = "Unknown"
 
     # Process additional fields from the JSON payload
     if 'remoteState' in bridge_info:

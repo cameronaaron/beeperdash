@@ -109,6 +109,8 @@
                 <th>Remote State</th>
                 <th>Version</th>
                 <th>Up-to-Date</th>
+                <th>Latest Commit Hash</th>
+                <th>Latest Commit Date</th>
             </tr>
         </thead>
         <tbody>
@@ -150,6 +152,8 @@
                         <span class="badge bg-secondary">Unknown</span>
                     {% endif %}
                 </td>
+                <td>{{ bridge_data.latest_commit_hash }}</td>
+                <td>{{ bridge_data.latest_commit_date }}</td>
             </tr>
         {% endfor %}
         </tbody>
