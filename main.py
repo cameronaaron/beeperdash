@@ -94,6 +94,10 @@ async def startup_event():
 def save_tokens_to_cookies(response: Response, access_token: str, jwt_token: str):
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     response.set_cookie(key="jwt_token", value=jwt_token, httponly=True)
+
+def retrieve_tokens_from_cookies(access_token: str, jwt_token: str):
+    return access_token, jwt_token
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.httpx_client.aclose()
@@ -208,7 +212,9 @@ async def login(request: Request, email: EmailStr = Form(...)):
         logger.error(f"Error during login: {exc.response.status_code}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Login failed"})
     
-    return templates.TemplateResponse("code.html", {"request": request, "login_request": request_data})
+    response = templates.TemplateResponse("code.html", {"request": request, "login_request": request_data})
+    save_tokens_to_cookies(response, "", "")
+    return response
 
 @app.post("/token")
 async def get_token(request: Request, code: str = Form(...), login_request: str = Form(...)):
