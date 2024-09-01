@@ -82,6 +82,11 @@ GITHUB_REPOS = {
     "twitter": "mautrix/twitter",
     "whatsapp": "mautrix/whatsapp",
     "hungryserv": "beeper/hungryserv",
+    "asmux": "beeper/asmux",
+    "gvoice": "mautrix/gvoice",
+    "imessage": "mautrix/imessage",
+    "imessagego": "beeper/imessagego",
+    "heisenbridge": "hifi/heisenbridge",
 }
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -145,6 +150,16 @@ async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]
         return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
 
 async def update_bridge_info(bridge_name, bridge_info):
+    if bridge_name not in GITHUB_REPOS:
+        logger.error(f"Bridge name {bridge_name} not found in GITHUB_REPOS")
+        bridge_info['is_up_to_date'] = None
+        bridge_info['latest_commit_date'] = "Unknown"
+        bridge_info['latest_version'] = "Unknown"
+        bridge_info['latest_commit_message'] = "Unknown"
+        bridge_info['current_commit_date'] = "Unknown"
+        bridge_info['current_commit_message'] = "Unknown"
+        return
+
     if 'version' in bridge_info and bridge_info['version']:
         current_version = bridge_info['version'].split(':')[-1].split('-')[0]
         latest_commit = await get_latest_github_commit_hash(bridge_name)
@@ -174,6 +189,14 @@ async def update_bridge_info(bridge_name, bridge_info):
 
     # Process additional fields from the JSON payload
     if 'remoteState' in bridge_info:
+        for remote_id, remote_info in bridge_info['remoteState'].items():
+            if 'info' in remote_info:
+                remote_info['battery_low'] = remote_info['info'].get('battery_low', None)
+                remote_info['browser_active'] = remote_info['info'].get('browser_active', None)
+                remote_info['google_account_pairing'] = remote_info['info'].get('google_account_pairing', None)
+                remote_info['mobile_data'] = remote_info['info'].get('mobile_data', None)
+                remote_info['settings'] = remote_info['info'].get('settings', None)
+                remote_info['sims'] = remote_info['info'].get('sims', None)
         for remote_id, remote_info in bridge_info['remoteState'].items():
             if 'info' in remote_info:
                 remote_info['battery_low'] = remote_info['info'].get('battery_low', None)
