@@ -13,10 +13,11 @@
 <body>
 <div class="container">
     <h2 class="mt-5">Enter the Challenge Code</h2>
-    <form method="post" action="/token">
+    <form method="post" action="/token" novalidate>
         <div class="form-group">
             <label for="code">Code:</label>
-            <input type="text" class="form-control" id="code" name="code" required>
+            <input type="text" class="form-control" id="code" name="code" required aria-describedby="codeHelp" autocomplete="off">
+            <div id="codeHelp" class="form-text">Enter the 6-digit challenge code.</div>
             <div class="invalid-feedback">Please enter a valid code.</div>
         </div>
         <input type="hidden" name="login_request" value="{{ login_request }}">

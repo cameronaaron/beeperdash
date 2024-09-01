@@ -9,8 +9,8 @@
 <body>
     <div class="container">
         <h1>Error</h1>
-        <p>{{ error }}</p>
-        <a href="/">Go back to Home</a>
+        <p>{{ error | e }}</p> <!-- Ensure error message is escaped to prevent XSS -->
+        <a href="/" class="btn btn-primary">Go back to Home</a>
     </div>
 </body>
 </html>
