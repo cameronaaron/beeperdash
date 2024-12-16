@@ -1,15 +1,14 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Cookie, Depends, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Cookie
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import Response
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
 import httpx
 import asyncio
 from pydantic import BaseModel, EmailStr
 import os
 import logging
-from typing import List, Dict, Any
-from fastapi.staticfiles import StaticFiles
+from typing import Dict, Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,56 +17,11 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-
-class TokenRequest(BaseModel):
-    code: str
-    request: str
-
-class ResetPasswordRequest(BaseModel):
-    access_token: str
-    jwt_token: str
-    new_password: str
-
-class CreateBridgeRequest(BaseModel):
-    beeper_token: str
-    bridge: str
-    region: str
-    bridgeType: str = None
-    isSelfHosted: bool = None
-    reason: str = None
-    source: str = None
-    stateEvent: str = None
-    username: str = None
-
-class DeleteBridgeRequest(BaseModel):
-    beeper_token: str
-    name: str
-
-class UserProfile(BaseModel):
-    full_name: str
-    email: EmailStr
-    analyticsId: str = None
-    bridgeClusterId: str = None
-    channel: str = None
-    createdAt: str = None
-    customerLead: Dict[str, Any] = None
-    dataLocation: str = None
-    deactivatedAt: str = None
-    deletedAt: str = None
-    hungryUrl: str = None
-    hungryUrlDirect: str = None
-    isAdmin: bool = None
-    isFree: bool = None
-    isUserBridgeChangesLocked: bool = None
-    referralCode: str = None
-    supportRoomId: str = None
-    token: str = None
-    username: str = None
-
+# GitHub Repositories mapping
 GITHUB_REPOS = {
     "discordgo": "mautrix/discord",
     "facebookgo": "mautrix/meta",
@@ -90,26 +44,41 @@ GITHUB_REPOS = {
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+
+
+class TokenRequest(BaseModel):
+    code: str
+    request: str
+
+
 @app.on_event("startup")
 async def startup_event():
     app.state.httpx_client = httpx.AsyncClient()
     app.state.notification_clients = []
 
-def save_tokens_to_cookies(response: Response, access_token: str, jwt_token: str):
-    response.set_cookie(key="access_token", value=access_token, httponly=True)
-    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True)
-
-def retrieve_tokens_from_cookies(request: Request) -> (str, str):
-    access_token = request.cookies.get("access_token")
-    jwt_token = request.cookies.get("jwt_token")
-    return access_token, jwt_token
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.httpx_client.aclose()
 
-# Mount the static directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
+def save_tokens_to_cookies(response: Response, access_token: str, jwt_token: str):
+    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True)
+
+
+def retrieve_tokens_from_cookies(request: Request):
+    access_token = request.cookies.get("access_token")
+    jwt_token = request.cookies.get("jwt_token")
+    return access_token, jwt_token
+
+
+def is_authenticated(access_token: str, jwt_token: str) -> bool:
+    return bool(access_token and jwt_token)
+
 
 async def make_authenticated_request(url: str) -> Dict[str, Any]:
     headers = {}
@@ -119,6 +88,7 @@ async def make_authenticated_request(url: str) -> Dict[str, Any]:
         response = await client.get(url, headers=headers, timeout=10.0)
         response.raise_for_status()
         return response.json()
+
 
 async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
     github_url = f"https://api.github.com/repos/{repo}/commits/{branch}"
@@ -133,18 +103,19 @@ async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
         logger.error(f"Error fetching commit data from {github_url}: {exc}")
         return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
 
+
 async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
     repo = GITHUB_REPOS.get(bridge_name, "")
     if not repo:
         return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
-    
-    branches = ["main", "master"]
-    for branch in branches:
+
+    # Try main or master branch
+    for branch in ["main", "master"]:
         commit_data = await get_github_commit_data(repo, branch)
         if commit_data["sha"] != "Unknown":
             return commit_data
-
     return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
+
 
 async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]:
     github_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash}"
@@ -158,6 +129,7 @@ async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error fetching commit data from {github_url}: {exc}")
         return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
+
 
 async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
     if bridge_name not in GITHUB_REPOS:
@@ -178,7 +150,7 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
         latest_version = latest_commit["sha"]
         latest_date = latest_commit["date"]
         latest_message = latest_commit["message"]
-        
+
         current_commit = await get_commit_data_by_hash(GITHUB_REPOS[bridge_name], current_version)
         current_date = current_commit["date"]
         current_message = current_commit["message"]
@@ -192,7 +164,8 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
             'current_commit_message': current_message
         })
 
-        logger.info(f"Bridge: {bridge_name}, Current version: {current_version}, Latest version: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}, Latest commit date: {latest_date}, Current commit date: {current_date}")
+        logger.info(f"Bridge: {bridge_name}, Current: {current_version}, Latest: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
+
     else:
         bridge_info.update({
             'is_up_to_date': None,
@@ -203,7 +176,7 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
             'current_commit_message': "Unknown"
         })
 
-    # Process additional fields from the JSON payload
+    # Process additional fields from JSON payload if present
     if 'remoteState' in bridge_info:
         for remote_id, remote_info in bridge_info['remoteState'].items():
             if 'info' in remote_info:
@@ -216,8 +189,6 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
                     'sims': remote_info['info'].get('sims', None)
                 })
 
-def is_authenticated(access_token: str, jwt_token: str) -> bool:
-    return bool(access_token and jwt_token)
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -226,10 +197,12 @@ async def login_page(request: Request):
         return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request})
 
+
 @app.post("/login")
 async def login(request: Request, email: EmailStr = Form(...)):
     client = app.state.httpx_client
     try:
+        # Initiate login request
         login_response = await client.post(
             "https://api.beeper.com/user/login",
             headers={"Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE"},
@@ -237,11 +210,14 @@ async def login(request: Request, email: EmailStr = Form(...)):
         )
         login_response.raise_for_status()
         request_data = login_response.json().get("request")
+
+        # Send email
         await client.post(
             "https://api.beeper.com/user/login/email",
             headers={
                 "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
-                "Content-Type": "application/json"},
+                "Content-Type": "application/json"
+            },
             json={"request": request_data, "email": email},
             timeout=10.0
         )
@@ -249,12 +225,13 @@ async def login(request: Request, email: EmailStr = Form(...)):
         logger.error(f"Error during login: {exc.response.status_code}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Login failed"})
     except httpx.RequestError as exc:
-        logger.error(f"An error occurred while requesting {exc.request.url!r}.")
+        logger.error(f"Request error: {exc}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Login failed"})
-    
+
     response = templates.TemplateResponse("code.html", {"request": request, "login_request": request_data})
     save_tokens_to_cookies(response, "", "")
     return response
+
 
 @app.post("/token")
 async def get_token(request: Request, code: str = Form(...), login_request: str = Form(...)):
@@ -264,18 +241,19 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
             "https://api.beeper.com/user/login/response",
             headers={
                 "Authorization": "Bearer BEEPER-PRIVATE-API-PLEASE-DONT-USE",
-                "Content-Type": "application/json"},
+                "Content-Type": "application/json"
+            },
             json={"request": login_request, "response": code},
             timeout=10.0
         )
         login_challenge_response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        logger.error(f"Error response {exc.response.status_code} while requesting {exc.request.url!r}.")
+        logger.error(f"Error: {exc.response.status_code}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Invalid token"})
     except httpx.RequestError as exc:
-        logger.error(f"An error occurred while requesting {exc.request.url!r}.")
+        logger.error(f"Request error: {exc}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Invalid token"})
-    
+
     token = login_challenge_response.json().get("token")
     access_token_response = await client.post(
         "https://matrix.beeper.com/_matrix/client/v3/login",
@@ -284,14 +262,16 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
         timeout=10.0
     )
     access_token = access_token_response.json().get("access_token")
+
     response = RedirectResponse(url="/dashboard", status_code=303)
     save_tokens_to_cookies(response, access_token, token)
     return response
 
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     access_token, jwt_token = retrieve_tokens_from_cookies(request)
-    if not access_token or not jwt_token:
+    if not is_authenticated(access_token, jwt_token):
         return RedirectResponse(url="/", status_code=302)
 
     client = app.state.httpx_client
@@ -304,10 +284,10 @@ async def dashboard(request: Request):
         beeper_response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error fetching Beeper data: {exc.response.status_code}")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch Beeper data"})
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch data"})
     except httpx.RequestError as exc:
-        logger.error(f"An error occurred while requesting {exc.request.url!r}.")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch Beeper data"})
+        logger.error(f"Request error: {exc}")
+        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch data"})
 
     beeper_data = beeper_response.json()
     bridges = beeper_data.get("user", {}).get("bridges", {})
@@ -320,20 +300,22 @@ async def dashboard(request: Request):
     ])
 
     return templates.TemplateResponse("dashboard.html", {
-        "request": request, 
-        "bridges": bridges, 
-        "beeper_data": beeper_data, 
-        "token": access_token, 
+        "request": request,
+        "bridges": bridges,
+        "beeper_data": beeper_data,
+        "token": access_token,
         "asmux_data": asmux_data,
         "user_info": user_info,
         "jwt_token": jwt_token,
-        "GITHUB_REPOS": GITHUB_REPOS,  # Pass GITHUB_REPOS to the template
+        "GITHUB_REPOS": GITHUB_REPOS
     })
+
 
 @app.post("/reset_password", response_class=HTMLResponse)
 async def reset_password(request: Request, access_token: str = Form(...), jwt_token: str = Form(...), new_password: str = Form(...)):
     client = app.state.httpx_client
     try:
+        # Initiate user interactive auth
         user_interactive_auth_response = await client.post(
             "https://matrix.beeper.com/_matrix/client/v3/account/password",
             headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
@@ -343,6 +325,8 @@ async def reset_password(request: Request, access_token: str = Form(...), jwt_to
         user_interactive_auth_response.raise_for_status()
         session_data = user_interactive_auth_response.json()
         session = session_data["session"]
+
+        # Complete auth with JWT
         await client.post(
             "https://matrix.beeper.com/_matrix/client/v3/account/password",
             headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
@@ -361,10 +345,11 @@ async def reset_password(request: Request, access_token: str = Form(...), jwt_to
         logger.error(f"Error resetting password: {exc.response.status_code}")
         return HTMLResponse(content="Failed to reset password", status_code=500)
     except httpx.RequestError as exc:
-        logger.error(f"An error occurred while requesting {exc.request.url!r}.")
+        logger.error(f"Request error: {exc}")
         return HTMLResponse(content="Failed to reset password", status_code=500)
-    
+
     return HTMLResponse(content="Password reset successfully")
+
 
 @app.post("/delete_bridge", response_class=HTMLResponse)
 async def delete_bridge(request: Request, beeper_token: str = Form(...), name: str = Form(...)):
@@ -373,36 +358,32 @@ async def delete_bridge(request: Request, beeper_token: str = Form(...), name: s
         res_delete_beeper = await client.delete(
             f"https://api.beeper.com/bridge/{name}",
             headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
-            timeout=10.0  # Set a timeout of 10 seconds
+            timeout=10.0
         )
         res_delete_beeper.raise_for_status()
     except httpx.ReadTimeout:
         logger.error("Request to delete bridge timed out.")
-        # Check if the bridge still exists
         try:
             res_check_bridge = await client.get(
                 f"https://api.beeper.com/bridge/{name}",
                 headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
-                timeout=10.0  # Set a timeout of 10 seconds
+                timeout=10.0
             )
             if res_check_bridge.status_code == 404:
-                return HTMLResponse(content=f"Bridge {name} deleted successfully (timeout occurred but bridge no longer exists).")
+                return HTMLResponse(content=f"Bridge {name} deleted successfully.")
             else:
-                return HTMLResponse(content="Request to delete bridge timed out. Please try again later.", status_code=500)
-        except httpx.HTTPStatusError as exc:
-            logger.error(f"Error checking bridge existence: {exc.response.status_code}")
-            return HTMLResponse(content="Failed to verify bridge deletion status.", status_code=500)
-        except httpx.RequestError as exc:
-            logger.error(f"An error occurred while requesting {exc.request.url!r}.")
-            return HTMLResponse(content="Failed to verify bridge deletion status.", status_code=500)
+                return HTMLResponse(content="Delete timed out, please try again.", status_code=500)
+        except:
+            return HTMLResponse(content="Failed to verify deletion status.", status_code=500)
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error deleting bridge: {exc.response.status_code}")
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
     except httpx.RequestError as exc:
-        logger.error(f"An error occurred while requesting {exc.request.url!r}.")
+        logger.error(f"Request error: {exc}")
         return HTMLResponse(content="Failed to delete bridge on Beeper", status_code=500)
-    
+
     return HTMLResponse(content=f"Bridge {name} deleted successfully")
+
 
 @app.post("/start_or_update_bridge", response_class=HTMLResponse)
 async def start_or_update_bridge(request: Request, beeper_token: str = Form(...), name: str = Form(...)):
@@ -411,56 +392,30 @@ async def start_or_update_bridge(request: Request, beeper_token: str = Form(...)
         res_start_update_beeper = await client.post(
             f"https://api.beeper.com/bridge/{name}/start",
             headers={"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"},
-            timeout=10.0  #  # Set a timeout of 10 seconds
+            timeout=10.0
         )
         res_start_update_beeper.raise_for_status()
     except httpx.ReadTimeout:
         logger.error("Request to start or update bridge timed out.")
-        return HTMLResponse(content="Request to start or update bridge timed out. Please try again later.", status_code=500)
+        return HTMLResponse(content="Operation timed out. Please try again.", status_code=500)
     except httpx.HTTPStatusError as exc:
-        logger.error(f"Error starting or updating bridge: {exc.response.status_code}")
+        logger.error(f"Error: {exc.response.status_code}")
         return HTMLResponse(content="Failed to start or update bridge on Beeper", status_code=500)
-    
+
     return HTMLResponse(content=f"Bridge {name} started or updated successfully")
-@app.get("/profile", response_class=HTMLResponse)
-async def get_profile(request: Request, access_token: str = Cookie(None)):
-    if not access_token:
-        access_token, _ = retrieve_tokens_from_cookies(access_token, None)
-        if not access_token:
-            return RedirectResponse(url="/", status_code=302)
 
-    client = app.state.httpx_client
-    profile_response = await client.get(
-        "https://api.beeper.com/user/profile",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if profile_response.status_code != 200:
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch profile data"})
-    profile_data = profile_response.json()
-    return templates.TemplateResponse("profile.html", {"request": request, "profile": profile_data})
 
-@app.post("/profile", response_class=HTMLResponse)
-async def update_profile(request: Request, access_token: str = Cookie(None), full_name: str = Form(...), email: EmailStr = Form(...)):
-    if not access_token:
-        access_token, _ = retrieve_tokens_from_cookies(access_token, None)
-        if not access_token:
-            return RedirectResponse(url="/", status_code=302)
-
-    client = app.state.httpx_client
-    try:
-        update_response = await client.put(
-            "https://api.beeper.com/user/profile",
-            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-            json={"full_name": full_name, "email": email},
-        )
-        if update_response.status_code != 200:
-            return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to update profile data"})
-        return RedirectResponse(url="/profile", status_code=303)
-    except Exception as e:
-        logger.error(f"An error occurred while updating profile data: {e}")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "An unexpected error occurred"})
 @app.post("/post_bridge_state", response_class=HTMLResponse)
-async def post_bridge_state(request: Request, beeper_token: str = Form(...), username: str = Form(...), bridge_name: str = Form(...), state_event: str = Form(...), reason: str = Form(...), is_self_hosted: bool = Form(...), bridge_type: str = Form(...)):
+async def post_bridge_state(
+    request: Request, 
+    beeper_token: str = Form(...), 
+    username: str = Form(...), 
+    bridge_name: str = Form(...), 
+    state_event: str = Form(...), 
+    reason: str = Form(...), 
+    is_self_hosted: bool = Form(...), 
+    bridge_type: str = Form(...)
+):
     client = app.state.httpx_client
     url = f"https://api.beeper.com/bridgebox/{username}/bridge/{bridge_name}/bridge_state"
     headers = {"Authorization": f"Bearer {beeper_token}", "Content-Type": "application/json"}
@@ -470,21 +425,15 @@ async def post_bridge_state(request: Request, beeper_token: str = Form(...), use
         "isSelfHosted": is_self_hosted,
         "bridgeType": bridge_type
     }
-    
+
     try:
-        response = await client.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=10.0  # Set a timeout of 10 seconds
-        )
+        response = await client.post(url, headers=headers, json=payload, timeout=10.0)
         response.raise_for_status()
     except httpx.ReadTimeout:
-        logger.error("Request to post bridge state timed out.")
-        return HTMLResponse(content="Request to post bridge state timed out. Please try again later.", status_code=500)
+        logger.error("Request timed out.")
+        return HTMLResponse(content="Request timed out. Try again later.", status_code=500)
     except httpx.HTTPStatusError as exc:
-        logger.error(f"Error posting bridge state: {exc.response.status_code}")
-        logger.error(f"Response content: {exc.response.text}")
-        return HTMLResponse(content=f"Failed to post bridge state on Beeper: {exc.response.text}", status_code=500)
-    
+        logger.error(f"Error posting bridge state: {exc.response.status_code}, {exc.response.text}")
+        return HTMLResponse(content=f"Failed to post bridge state: {exc.response.text}", status_code=500)
+
     return HTMLResponse(content=f"Bridge state for {bridge_name} posted successfully")
