@@ -6,98 +6,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beeper Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="/static/css/custom.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://unpkg.com/@popperjs/core@2/dist/umd/popper.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </head>
 <body>
 <div class="container">
     <h2 class="mt-5">Beeper Dashboard</h2>
-    
-    <!-- User Information Table -->
     <h3>User Information</h3>
     <p>This section displays detailed information about your Beeper account.</p>
     <table class="table table-bordered">
         <thead>
-            <tr>
-                <th>Field</th>
-                <th>Value</th>
-            </tr>
+            <tr><th>Field</th><th>Value</th></tr>
         </thead>
         <tbody>
-            <tr>
-                <td>Analytics ID</td>
-                <td>{{ user_info.analyticsId }}</td>
-            </tr>
-            <tr>
-                <td>Bridge Cluster ID</td>
-                <td>{{ user_info.bridgeClusterId }}</td>
-            </tr>
-            <tr>
-                <td>Channel</td>
-                <td>{{ user_info.channel }}</td>
-            </tr>
-            <tr>
-                <td>Created At</td>
-                <td>{{ user_info.createdAt }}</td>
-            </tr>
-            <tr>
-                <td>Full Name</td>
-                <td>{{ user_info.fullName }}</td>
-            </tr>
-            <tr>
-                <td>Email</td>
-                <td>{{ user_info.email }}</td>
-            </tr>
-            <tr>
-                <td>Is Admin</td>
-                <td>{{ user_info.isAdmin }}</td>
-            </tr>
-            <tr>
-                <td>Is Free</td>
-                <td>{{ user_info.isFree }}</td>
-            </tr>
-            <tr>
-                <td>Username</td>
-                <td>{{ user_info.username }}</td>
-            </tr>
-            <tr>
-                <td>Referral Code</td>
-                <td>{{ user_info.referralCode }}</td>
-            </tr>
-            <tr>
-                <td>Data Location</td>
-                <td>{{ user_info.dataLocation }}</td>
-            </tr>
-            <tr>
-                <td>Deactivated At</td>
-                <td>{{ user_info.deactivatedAt }}</td>
-            </tr>
-            <tr>
-                <td>Deleted At</td>
-                <td>{{ user_info.deletedAt }}</td>
-            </tr>
-            <tr>
-                <td>Hungry URL</td>
-                <td>{{ user_info.hungryUrl }}</td>
-            </tr>
-            <tr>
-                <td>Hungry URL Direct</td>
-                <td>{{ user_info.hungryUrlDirect }}</td>
-            </tr>
-            <tr>
-                <td>Is User Bridge Changes Locked</td>
-                <td>{{ user_info.isUserBridgeChangesLocked }}</td>
-            </tr>
-            <tr>
-                <td>Support Room ID</td>
-                <td>{{ user_info.supportRoomId }}</td>
-            </tr>
+            <tr><td>Analytics ID</td><td>{{ user_info.analyticsId }}</td></tr>
+            <tr><td>Bridge Cluster ID</td><td>{{ user_info.bridgeClusterId }}</td></tr>
+            <tr><td>Channel</td><td>{{ user_info.channel }}</td></tr>
+            <tr><td>Created At</td><td>{{ user_info.createdAt }}</td></tr>
+            <tr><td>Full Name</td><td>{{ user_info.fullName }}</td></tr>
+            <tr><td>Email</td><td>{{ user_info.email }}</td></tr>
+            <tr><td>Is Admin</td><td>{{ user_info.isAdmin }}</td></tr>
+            <tr><td>Is Free</td><td>{{ user_info.isFree }}</td></tr>
+            <tr><td>Username</td><td>{{ user_info.username }}</td></tr>
+            <tr><td>Referral Code</td><td>{{ user_info.referralCode }}</td></tr>
+            <tr><td>Data Location</td><td>{{ user_info.dataLocation }}</td></tr>
+            <tr><td>Deactivated At</td><td>{{ user_info.deactivatedAt }}</td></tr>
+            <tr><td>Deleted At</td><td>{{ user_info.deletedAt }}</td></tr>
+            <tr><td>Hungry URL</td><td>{{ user_info.hungryUrl }}</td></tr>
+            <tr><td>Hungry URL Direct</td><td>{{ user_info.hungryUrlDirect }}</td></tr>
+            <tr><td>Is User Bridge Changes Locked</td><td>{{ user_info.isUserBridgeChangesLocked }}</td></tr>
+            <tr><td>Support Room ID</td><td>{{ user_info.supportRoomId }}</td></tr>
         </tbody>
     </table>
 
-    <!-- Bridges Table -->
     <h3>Bridges</h3>
     <p>This section provides an overview of all the bridges associated with your account.</p>
     <table class="table table-bordered">
@@ -152,45 +98,40 @@
                         <span class="badge bg-secondary">Unknown</span>
                     {% endif %}
                 </td>
-                
-                <td>{{ bridge_data.current_commit_date }}</td> <!-- Add this cell -->
+                <td>{{ bridge_data.current_commit_date }}</td>
                 <td>{{ bridge_data.latest_commit_date }}</td>
-
             </tr>
         {% endfor %}
         </tbody>
     </table>
 
-    <!-- Manage Bridges Section -->
     <h2 class="mt-5">Manage Bridges</h2>
 
-    <!-- Reset Password Form -->
     <h3>Reset Password</h3>
     <p>Use this form to reset your account password.</p>
     <form method="post" action="/reset_password">
-        <div class="form-group">
-            <label for="access_token">Access Token:</label>
+        <div class="mb-3">
+            <label for="access_token" class="form-label">Access Token:</label>
             <input type="text" class="form-control" id="access_token" name="access_token" value="{{ token }}" required>
         </div>
-        <div class="form-group">
-            <label for="jwt_token">JWT Token:</label>
+        <div class="mb-3">
+            <label for="jwt_token" class="form-label">JWT Token:</label>
             <input type="text" class="form-control" id="jwt_token" name="jwt_token" value="{{ jwt_token }}" required>
         </div>
-        <div class="form-group">
-            <label for="new_password">New Password:</label>
+        <div class="mb-3">
+            <label for="new_password" class="form-label">New Password:</label>
             <input type="password" class="form-control" id="new_password" name="new_password" required>
         </div>
         <button type="submit" class="btn btn-primary">Reset Password</button>
     </form>
 
-
-    <!-- Delete Bridge Form -->
+    <h3>Delete Bridge</h3>
     <form method="post" action="/delete_bridge">
-        <div class="form-group">
-            <label for="beeper_token">Beeper Token:</label>
+        <div class="mb-3">
+            <label for="beeper_token" class="form-label">Beeper Token:</label>
             <input type="text" class="form-control" id="beeper_token" name="beeper_token" value="{{ token }}" required>
         </div>
-        <div class="form-group">
+        <div class="mb-3">
             <label for="bridge">Bridge:</label>
             <select id="bridge" name="name" class="form-control" required>
                 {% for bridge in GITHUB_REPOS.keys() %}
@@ -201,137 +142,90 @@
         <button type="submit" class="btn btn-primary">Delete Bridge</button>
     </form>
 
-    <!-- Start or Update Bridge Form -->
-<form method="post" action="/start_or_update_bridge" onsubmit="setBridgeName()">
-    <div class="form-group">
-        <label for="beeper_token">Beeper Token:</label>
-        <input type="text" class="form-control" id="beeper_token" name="beeper_token" value="{{ token }}" required>
-    </div>
-    <div class="form-group">
-        <label for="bridge">Bridge:</label>
-        <select id="bridge" name="name" class="form-control" required>
-            {% for bridge in GITHUB_REPOS.keys() %}
-            <option value="{{ bridge }}">{{ bridge }}</option>
-            {% endfor %}
-            <option value="other">Other</option>
-        </select>
-    </div>
-    <div class="form-group">
-        <label for="other_bridge">Specify Bridge Name:</label>
-        <input type="text" class="form-control" id="other_bridge" name="other_bridge" oninput="checkOtherBridge()">
-    </div>
-    <button type="submit" class="btn btn-primary">Start or Update Bridge</button>
-</form>
-
-<script>
-function checkOtherBridge() {
-    var otherBridgeInput = document.getElementById('other_bridge');
-    var bridgeSelect = document.getElementById('bridge');
-    if (otherBridgeInput.value.trim() !== '') {
-        bridgeSelect.value = 'other';
-    }
-}
-
-function setBridgeName() {
-    var otherBridgeInput = document.getElementById('other_bridge');
-    var bridgeSelect = document.getElementById('bridge');
-    if (otherBridgeInput.value.trim() !== '') {
-        bridgeSelect.name = ''; // Disable the dropdown name
-        otherBridgeInput.name = 'name'; // Use the text box name
-    }
-}
-</script>
-
-    <!-- User Profile Management Section -->
-    <h2 class="mt-5">User Profile Management</h2>
-    <h3>Update Profile</h3>
-    <p>Use this form to update your profile information.</p>
-    <form method="post" action="/profile">
-        <div class="form-group">
-            <label for="full_name">Full Name:</label>
-            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user_info.fullName }}" required>
-        </div>
-        <div class="form-group">
-            <label for="email">Email:</label>
-            <input type="email" class="form-control" id="email" name="email" value="{{ user_info.email }}" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Update Profile</button>
-    </form>
-
-    <!-- Post Bridge State Form -->
-    <h3>Post Bridge State</h3>
-    <p>Use this form to post the state of a bridge.</p>
-    <form id="postBridgeStateForm">
-        <div class="form-group">
-            <label for="beeper_token">Beeper Token:</label>
+    <h3>Start or Update Bridge</h3>
+    <form method="post" action="/start_or_update_bridge" onsubmit="setBridgeName()">
+        <div class="mb-3">
+            <label for="beeper_token" class="form-label">Beeper Token:</label>
             <input type="text" class="form-control" id="beeper_token" name="beeper_token" value="{{ token }}" required>
         </div>
-        <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" class="form-control" id="username" name="username" value="{{ user_info.username }}" required>
-        </div>
-        <div class="form-group">
-            <label for="bridge_name">Bridge Name:</label>
-            <select id="bridge_name" name="bridge_name" class="form-control" required>
+        <div class="mb-3">
+            <label for="bridge_select">Bridge:</label>
+            <select id="bridge_select" class="form-control" required>
                 {% for bridge in GITHUB_REPOS.keys() %}
                 <option value="{{ bridge }}">{{ bridge }}</option>
                 {% endfor %}
                 <option value="other">Other</option>
             </select>
         </div>
-        <div class="form-group">
-            <label for="state_event">State Event:</label>
+        <div class="mb-3">
+            <label for="other_bridge" class="form-label">Specify Bridge Name (if Other):</label>
+            <input type="text" class="form-control" id="other_bridge" oninput="checkOtherBridge()">
+        </div>
+        <button type="submit" class="btn btn-primary">Start or Update Bridge</button>
+    </form>
+
+    <h2 class="mt-5">User Profile Management</h2>
+    <h3>Update Profile</h3>
+    <p>Use this form to update your profile information.</p>
+    <form method="post" action="/profile">
+        <div class="mb-3">
+            <label for="full_name" class="form-label">Full Name:</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user_info.fullName }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email:</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ user_info.email }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Profile</button>
+    </form>
+
+    <h3>Post Bridge State</h3>
+    <p>Use this form to post the state of a bridge.</p>
+    <form id="postBridgeStateForm">
+        <div class="mb-3">
+            <label for="beeper_token_state" class="form-label">Beeper Token:</label>
+            <input type="text" class="form-control" id="beeper_token_state" name="beeper_token" value="{{ token }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="username_state" class="form-label">Username:</label>
+            <input type="text" class="form-control" id="username_state" name="username" value="{{ user_info.username }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="bridge_name_state" class="form-label">Bridge Name:</label>
+            <select id="bridge_name_state" name="bridge_name" class="form-control" required>
+                {% for bridge in GITHUB_REPOS.keys() %}
+                <option value="{{ bridge }}">{{ bridge }}</option>
+                {% endfor %}
+                <option value="other">Other</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="state_event" class="form-label">State Event:</label>
             <input type="text" class="form-control" id="state_event" name="state_event" required>
         </div>
-        <div class="form-group">
-            <label for="reason">Reason:</label>
+        <div class="mb-3">
+            <label for="reason" class="form-label">Reason:</label>
             <input type="text" class="form-control" id="reason" name="reason" required>
         </div>
-        <div class="form-group">
-            <label for="is_self_hosted">Is Self Hosted:</label>
-            <input type="checkbox" id="is_self_hosted" name="is_self_hosted">
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="is_self_hosted" name="is_self_hosted">
+            <label class="form-check-label" for="is_self_hosted">Is Self Hosted</label>
         </div>
-        <div class="form-group">
-            <label for="bridge_type">Bridge Type:</label>
+        <div class="mb-3">
+            <label for="bridge_type" class="form-label">Bridge Type:</label>
             <input type="text" class="form-control" id="bridge_type" name="bridge_type" required>
         </div>
         <button type="submit" class="btn btn-primary">Post Bridge State</button>
     </form>
     <div id="postBridgeStateResponse" class="mt-3"></div>
+</div>
 
-    <!-- Existing content -->
-
-    <script>
-    document.getElementById('postBridgeStateForm').addEventListener('submit', async function(event) {
-        event.preventDefault();
-
-        const form = event.target;
-        const formData = new FormData(form);
-        const responseDiv = document.getElementById('postBridgeStateResponse');
-
-        try {
-            const response = await fetch('/post_bridge_state', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.text();
-            if (response.ok) {
-                responseDiv.innerHTML = `<div class="alert alert-success">${result}</div>`;
-            } else {
-                responseDiv.innerHTML = `<div class="alert alert-danger">${result}</div>`;
-            }
-        } catch (error) {
-            responseDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
-        }
-    });
-    </script>
-<!-- Tooltip and Modal -->
+<!-- Modal -->
 <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="infoModalLabel">Dashboard Information</h5>
+                <h5 class="modal-title">Dashboard Information</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -345,10 +239,47 @@ function setBridgeName() {
 </div>
 
 <script>
-$(document).ready(function() {
-    // Tooltip initialization
-    $('[data-toggle="tooltip"]').tooltip();
+function checkOtherBridge() {
+    var otherBridgeInput = document.getElementById('other_bridge');
+    var bridgeSelect = document.getElementById('bridge_select');
+    if (otherBridgeInput.value.trim() !== '') {
+        bridgeSelect.value = 'other';
+    }
+}
 
+function setBridgeName() {
+    var otherBridgeInput = document.getElementById('other_bridge');
+    var bridgeSelect = document.getElementById('bridge_select');
+    if (otherBridgeInput.value.trim() !== '') {
+        bridgeSelect.name = '';
+        otherBridgeInput.name = 'name';
+    } else {
+        bridgeSelect.name = 'name';
+        otherBridgeInput.name = '';
+    }
+}
+
+document.getElementById('postBridgeStateForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const responseDiv = document.getElementById('postBridgeStateResponse');
+
+    try {
+        const response = await fetch('/post_bridge_state', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.text();
+        if (response.ok) {
+            responseDiv.innerHTML = `<div class="alert alert-success">${result}</div>`;
+        } else {
+            responseDiv.innerHTML = `<div class="alert alert-danger">${result}</div>`;
+        }
+    } catch (error) {
+        responseDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
+    }
 });
 </script>
 </body>
