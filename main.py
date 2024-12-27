@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr
 import os
 import logging
 from typing import Dict, Any
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Create static directory if it doesn't exist
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
+css_dir = static_dir / "css"
+css_dir.mkdir(exist_ok=True)
+
+# Update the static files mounting
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+else:
+    logger.warning("Static directory does not exist, static files will not be served")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
