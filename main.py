@@ -315,40 +315,70 @@ async def dashboard(request: Request):
 async def reset_password(request: Request, access_token: str = Form(...), jwt_token: str = Form(...), new_password: str = Form(...)):
     client = app.state.httpx_client
     try:
-        # Initiate user interactive auth
-        user_interactive_auth_response = await client.post(
-            "https://matrix.beeper.com/_matrix/client/v3/account/password",
-            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-            json={},
+        # Verify access token is valid
+        whoami_response = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"},
             timeout=10.0
         )
-        user_interactive_auth_response.raise_for_status()
-        session_data = user_interactive_auth_response.json()
-        session = session_data["session"]
+        whoami_response.raise_for_status()
 
-        # Complete auth with JWT
-        await client.post(
+        # Start interactive auth session by attempting password change
+        initial_response = await client.post(
             "https://matrix.beeper.com/_matrix/client/v3/account/password",
-            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            },
             json={
-                "auth": {
-                    "type": "org.matrix.login.jwt",
-                    "token": jwt_token,
-                    "session": session,
-                },
                 "new_password": new_password,
-                "logout_devices": False,
+                "logout_devices": False
             },
             timeout=10.0
         )
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"Error resetting password: {exc.response.status_code}")
-        return HTMLResponse(content="Failed to reset password", status_code=500)
-    except httpx.RequestError as exc:
-        logger.error(f"Request error: {exc}")
-        return HTMLResponse(content="Failed to reset password", status_code=500)
 
-    return HTMLResponse(content="Password reset successfully")
+        if initial_response.status_code == 401:  # Expected status for auth required
+            auth_data = initial_response.json()
+            session = auth_data.get("session")
+
+            if not session:
+                return HTMLResponse(content="Failed to start authentication session", status_code=400)
+
+            # Complete password change with JWT auth
+            password_response = await client.post(
+                "https://matrix.beeper.com/_matrix/client/v3/account/password",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "auth": {
+                        "type": "org.matrix.login.jwt",
+                        "token": jwt_token,
+                        "session": session
+                    },
+                    "new_password": new_password,
+                    "logout_devices": False
+                },
+                timeout=10.0
+            )
+            password_response.raise_for_status()
+            return HTMLResponse(content="Password reset successfully")
+        else:
+            return HTMLResponse(content="Unexpected response from server", status_code=500)
+
+    except httpx.HTTPStatusError as exc:
+        error_msg = f"Failed to reset password: {exc.response.text}"
+        logger.error(f"Error resetting password: {exc.response.status_code} - {error_msg}")
+        return HTMLResponse(content=error_msg, status_code=exc.response.status_code)
+    except httpx.RequestError as exc:
+        error_msg = f"Request error: {str(exc)}"
+        logger.error(error_msg)
+        return HTMLResponse(content=error_msg, status_code=500)
+    except Exception as exc:
+        error_msg = f"Unexpected error: {str(exc)}"
+        logger.error(error_msg)
+        return HTMLResponse(content=error_msg, status_code=500)
 
 
 @app.post("/delete_bridge", response_class=HTMLResponse)

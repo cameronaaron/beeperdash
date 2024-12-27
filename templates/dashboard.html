@@ -164,79 +164,23 @@
         <button type="submit" class="btn btn-primary">Start or Update Bridge</button>
     </form>
 
-    <h2 class="mt-5">User Profile Management</h2>
-    <h3>Update Profile</h3>
-    <p>Use this form to update your profile information.</p>
-    <form method="post" action="/profile">
-        <div class="mb-3">
-            <label for="full_name" class="form-label">Full Name:</label>
-            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user_info.fullName }}" required>
-        </div>
-        <div class="mb-3">
-            <label for="email" class="form-label">Email:</label>
-            <input type="email" class="form-control" id="email" name="email" value="{{ user_info.email }}" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Update Profile</button>
-    </form>
-
-    <h3>Post Bridge State</h3>
-    <p>Use this form to post the state of a bridge.</p>
-    <form id="postBridgeStateForm">
-        <div class="mb-3">
-            <label for="beeper_token_state" class="form-label">Beeper Token:</label>
-            <input type="text" class="form-control" id="beeper_token_state" name="beeper_token" value="{{ token }}" required>
-        </div>
-        <div class="mb-3">
-            <label for="username_state" class="form-label">Username:</label>
-            <input type="text" class="form-control" id="username_state" name="username" value="{{ user_info.username }}" required>
-        </div>
-        <div class="mb-3">
-            <label for="bridge_name_state" class="form-label">Bridge Name:</label>
-            <select id="bridge_name_state" name="bridge_name" class="form-control" required>
-                {% for bridge in GITHUB_REPOS.keys() %}
-                <option value="{{ bridge }}">{{ bridge }}</option>
-                {% endfor %}
-                <option value="other">Other</option>
-            </select>
-        </div>
-        <div class="mb-3">
-            <label for="state_event" class="form-label">State Event:</label>
-            <input type="text" class="form-control" id="state_event" name="state_event" required>
-        </div>
-        <div class="mb-3">
-            <label for="reason" class="form-label">Reason:</label>
-            <input type="text" class="form-control" id="reason" name="reason" required>
-        </div>
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="is_self_hosted" name="is_self_hosted">
-            <label class="form-check-label" for="is_self_hosted">Is Self Hosted</label>
-        </div>
-        <div class="mb-3">
-            <label for="bridge_type" class="form-label">Bridge Type:</label>
-            <input type="text" class="form-control" id="bridge_type" name="bridge_type" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Post Bridge State</button>
-    </form>
-    <div id="postBridgeStateResponse" class="mt-3"></div>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Dashboard Information</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                This dashboard provides an overview of your Beeper account, bridges, and real-time updates.
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    <!-- Modal -->
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Dashboard Information</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    This dashboard provides an overview of your Beeper account, bridges, and real-time updates.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
 <script>
 function checkOtherBridge() {
@@ -258,29 +202,6 @@ function setBridgeName() {
         otherBridgeInput.name = '';
     }
 }
-
-document.getElementById('postBridgeStateForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-    const responseDiv = document.getElementById('postBridgeStateResponse');
-
-    try {
-        const response = await fetch('/post_bridge_state', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.text();
-        if (response.ok) {
-            responseDiv.innerHTML = `<div class="alert alert-success">${result}</div>`;
-        } else {
-            responseDiv.innerHTML = `<div class="alert alert-danger">${result}</div>`;
-        }
-    } catch (error) {
-        responseDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
-    }
-});
 </script>
 </body>
 </html>
