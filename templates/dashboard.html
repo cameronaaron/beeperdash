@@ -71,6 +71,85 @@
             padding: 8px;
             border-radius: 4px;
         }
+        .additional-info .accordion-button {
+            padding: 0.5rem 1rem;
+            font-size: 0.9em;
+        }
+
+        .additional-info .accordion-body {
+            padding: 0.5rem;
+            background: #f8f9fa;
+        }
+
+        .additional-info pre {
+            margin: 0;
+            white-space: pre-wrap;
+            max-height: none;
+        }
+
+        .additional-info .accordion-item {
+            margin-bottom: 0.25rem;
+            border: 1px solid rgba(0,0,0,.125);
+            border-radius: 4px;
+        }
+
+        /* Standardize accordion styles */
+        .accordion-button {
+            font-size: 0.9rem !important; /* Force consistent size */
+            padding: 0.75rem 1rem;
+        }
+
+        .accordion-body {
+            font-size: 0.9rem;
+        }
+
+        .accordion pre {
+            font-size: 0.85rem;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        /* Make all info sections consistent */
+        .additional-info,
+        .profile-info,
+        .bridge-details,
+        .remote-state,
+        .connection-info,
+        .bridge-meta,
+        .remote-counts {
+            font-size: 0.9rem !important;
+        }
+
+        .additional-info pre,
+        .profile-info pre,
+        .bridge-details pre {
+            font-size: 0.85rem;
+            max-height: none;
+            margin: 0.5rem 0;
+        }
+
+        /* Table cell font sizes */
+        .table td, .table th {
+            font-size: 0.9rem;
+        }
+
+        /* Badge font sizes */
+        .badge {
+            font-size: 0.8rem;
+        }
+
+        /* Small text consistency */
+        small, .small {
+            font-size: 0.85rem !important;
+        }
+
+        /* Consistent accordion header sizes */
+        .accordion h4, 
+        .accordion h5, 
+        .accordion h6 {
+            font-size: 1rem;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -222,19 +301,38 @@
                                     </div>
                                     {% endif %}
 
-                                    {% if remote_info.info %}
                                     <div class="additional-info mt-2">
                                         <strong>Additional Info:</strong>
-                                        {% for key, value in remote_info.info.items() %}
-                                            <br>• {{ key }}:
-                                            {% if value is mapping or value is sequence %}
-                                                <pre class="small">{{ value|tojson(indent=2) }}</pre>
-                                            {% else %}
-                                                {{ value }}
-                                            {% endif %}
-                                        {% endfor %}
+                                        {% if remote_info.info %}
+                                        <div class="accordion mt-2" id="additionalInfo{{ bridge_name }}{{ loop.index }}">
+                                            {% for key, value in remote_info.info.items() %}
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header">
+                                                    <button class="accordion-button collapsed" type="button" 
+                                                            data-bs-toggle="collapse" 
+                                                            data-bs-target="#{{ key }}{{ bridge_name }}{{ loop.index }}">
+                                                        {{ key }}
+                                                    </button>
+                                                </h2>
+                                                <div id="{{ key }}{{ bridge_name }}{{ loop.index }}" 
+                                                     class="accordion-collapse collapse">
+                                                    <div class="accordion-body">
+                                                        {% if value is mapping %}
+                                                            <pre class="small">{{ value|tojson(indent=2) }}</pre>
+                                                        {% elif value is sequence %}
+                                                            <pre class="small">{{ value|tojson(indent=2) }}</pre>
+                                                        {% else %}
+                                                            {{ value }}
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <p class="text-muted">No additional information available</p>
+                                        {% endif %}
                                     </div>
-                                    {% endif %}
                                 </div>
                             </div>
                             {% if not loop.last %}<hr>{% endif %}
@@ -336,6 +434,95 @@
         {% endfor %}
         </tbody>
     </table>
+
+    <!-- Add this after the bridges table -->
+    <div class="accordion mt-4" id="appServiceAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#appServices">
+                    App Services Management
+                </button>
+            </h2>
+            <div id="appServices" class="accordion-collapse collapse show">
+                <div class="accordion-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Register App Service</h4>
+                            <form id="registerAppService" onsubmit="return handleAppServiceRegistration(event)">
+                                <div class="mb-3">
+                                    <label for="bridge" class="form-label">Bridge</label>
+                                    <select class="form-control" id="bridge" name="bridge" required>
+                                        {% for bridge_name in bridges.keys() %}
+                                        <option value="{{ bridge_name }}">{{ bridge_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Bridge Address (URL)</label>
+                                    <input type="text" class="form-control" id="address" name="address" 
+                                           placeholder="http://your-bridge-host:8080" 
+                                           pattern="https?://.+" required>
+                                    <div class="form-text">
+                                        Enter the full URL where your bridge is running. Examples:
+                                        <ul class="mt-1">
+                                            <li>http://localhost:8080 (for local development)</li>
+                                            <li>http://bridge-container:8080 (for Docker containers)</li>
+                                            <li>https://your-domain.com/bridge (for hosted instances)</li>
+                                        </ul>
+                                        <strong>Note:</strong> The URL must be accessible from the Beeper server.
+                                        Make sure to include the protocol (http:// or https://) and port if needed.
+                                    </div>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="push" name="push">
+                                    <label class="form-check-label" for="push">Enable Push</label>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="selfHosted" name="selfHosted">
+                                    <label class="form-check-label" for="selfHosted">Self Hosted</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Register</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Active App Services</h4>
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Bridge</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for bridge_name, app_service in app_services.items() %}
+                                        <tr>
+                                            <td>{{ bridge_name }}</td>
+                                            <td>
+                                                {% if app_service %}
+                                                <span class="badge bg-success">Active</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Not Registered</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if app_service %}
+                                                <button class="btn btn-sm btn-danger" onclick="deleteAppService('{{ bridge_name }}')">Delete</button>
+                                                <button class="btn btn-sm btn-info" onclick="viewAppService('{{ bridge_name }}')">View</button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <h2 class="mt-5">Manage Bridges</h2>
 
@@ -555,6 +742,61 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+async function handleAppServiceRegistration(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    try {
+        const response = await fetch(`/api/appservice/${formData.get('bridge')}`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error('Registration failed');
+        alert('App service registered successfully');
+        location.reload();
+    } catch (error) {
+        alert('Failed to register app service: ' + error.message);
+    }
+}
+
+async function deleteAppService(bridge) {
+    if (!confirm(`Are you sure you want to delete the app service for ${bridge}?`)) return;
+    try {
+        const response = await fetch(`/api/appservice/${bridge}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Deletion failed');
+        alert('App service deleted successfully');
+        location.reload();
+    } catch (error) {
+        alert('Failed to delete app service: ' + error.message);
+    }
+}
+
+async function viewAppService(bridge) {
+    try {
+        const response = await fetch(`/api/appservice/${bridge}`);
+        if (!response.ok) throw new Error('Failed to fetch details');
+        const data = await response.json();
+        alert(JSON.stringify(data, null, 2));
+    } catch (error) {
+        alert('Failed to view app service: ' + error.message);
+    }
+}
+
+// Add server time sync display
+setInterval(async () => {
+    try {
+        const response = await fetch('/api/time/sync');
+        if (!response.ok) throw new Error('Time sync failed');
+        const data = await response.json();
+        document.getElementById('serverTime').textContent = new Date(data.server_time).toLocaleString();
+        document.getElementById('timePrecision').textContent = 
+            `±${Math.round(data.precision_ms)}ms`;
+    } catch (error) {
+        console.error('Time sync error:', error);
+    }
+}, 30000);
 </script>
 </body>
 </html>

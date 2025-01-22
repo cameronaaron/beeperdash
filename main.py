@@ -17,11 +17,18 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 import httpx
 import asyncio
+import json  # Add this import
 from pydantic import BaseModel, EmailStr
 import os
 import logging
-from typing import Dict, Any
+import time
+from typing import Dict, Any, Tuple, Optional, List, TypeVar, Generic
 from pathlib import Path
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from enum import Enum
+from pydantic import Field
+import contextlib
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -83,6 +90,14 @@ class LoginRequest(BaseModel):
 class TokenRequest(BaseModel):
     code: str
     request: str
+
+
+class BeeperError(Exception):
+    """Custom exception for Beeper API errors"""
+    def __init__(self, message: str, status_code: int):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
 
 
 @app.on_event("startup")
@@ -161,7 +176,7 @@ async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
         repo_url = f"https://api.github.com/repos/{repo}"
         repo_data = await make_authenticated_request(repo_url)
         default_branch = repo_data.get("default_branch")
-        if default_branch:
+        if (default_branch):
             commit_data = await get_github_commit_data(repo, default_branch)
             if commit_data["sha"] != "Unknown":
                 return commit_data
@@ -396,13 +411,54 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
     return response
 
 
+def extract_domain_and_username(user_data: dict) -> tuple[str, str]:
+    """Extract domain and username from Beeper user data"""
+    try:
+        # Debug log the structure
+        logger.debug(f"User data structure: {str(user_data)}")
+        
+        # Get username - seems to be consistent in userInfo
+        if "userInfo" in user_data:
+            username = user_data["userInfo"].get("username")
+            if not username:
+                raise ValueError("Username not found in userInfo")
+            
+            # Try to get domain from hungryUrl
+            hungry_url = user_data["userInfo"].get("hungryUrl", "")
+            if hungry_url and "matrix." in hungry_url:
+                domain = hungry_url.split("matrix.")[-1].split("/")[0]
+                logger.debug(f"Extracted domain {domain} and username {username} from hungryUrl")
+                return domain, username
+
+        # Fallback to user object if present
+        if "user" in user_data:
+            user = user_data["user"]
+            if user.get("username") and user.get("domain"):
+                logger.debug(f"Found username/domain in user object")
+                return user["domain"], user["username"]
+
+        # As a last resort, try to extract from bridgeState
+        if "user" in user_data and "bridges" in user_data["user"]:
+            # Look for hungryserv bridge first as it's most likely to have the correct info
+            bridges = user_data["user"]["bridges"]
+            if "hungryserv" in bridges:
+                remote_state = bridges["hungryserv"].get("remoteState", {})
+                for remote_id in remote_state:
+                    if "@" in remote_id and ":" in remote_id:
+                        # Format: @username:domain
+                        domain = remote_id.split(":")[-1]
+                        logger.debug(f"Extracted domain {domain} from hungryserv remote state")
+                        return domain, username
+
+        raise ValueError("Could not extract domain and username from user data")
+    except Exception as e:
+        logger.error(f"Error extracting domain and username: {str(e)}")
+        logger.error(f"Available fields in userInfo: {str(user_data.get('userInfo', {}))}")
+        raise ValueError(f"Failed to parse user data: {str(e)}")
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """
-    Main dashboard view.
-    DISCLAIMER: Unofficial tool created by Cameron Aaron.
-    Not affiliated with or endorsed by Beeper/Automatic.
-    """
+    """Main dashboard view with enhanced app service management"""
     access_token, jwt_token = retrieve_tokens_from_cookies(request)
     if not is_authenticated(access_token, jwt_token):
         return RedirectResponse(url="/", status_code=302)
@@ -412,20 +468,48 @@ async def dashboard(request: Request):
         beeper_response = await client.get(
             "https://api.beeper.com/whoami",
             headers={"Authorization": f"Bearer {access_token}"},
-            timeout=5.0  # reduced timeout
+            timeout=5.0
         )
         beeper_response.raise_for_status()
         beeper_data = beeper_response.json()
         
+        # Initialize variables
         bridges = beeper_data.get("user", {}).get("bridges", {})
+        app_services = {}
+        server_time = datetime.now()
+        precision = timedelta(0)
+        domain = None
+        
+        try:
+            # Extract domain and initialize HungryAPI client
+            domain, username = extract_domain_and_username(beeper_data)
+            hungry_client = HungryAPIClient(
+                base_domain=domain,
+                username=username,
+                access_token=access_token
+            )
+            
+            # Get app services and time info
+            server_time, precision = await hungry_client.get_server_time()
+            
+            for bridge_name in bridges.keys():
+                try:
+                    app_service = await hungry_client.get_app_service(bridge_name)
+                    app_services[bridge_name] = app_service
+                except Exception as e:
+                    logger.debug(f"No app service for bridge {bridge_name}: {str(e)}")
+                    app_services[bridge_name] = None
+                    
+        except ValueError as e:
+            logger.warning(f"Domain extraction failed: {str(e)}")
+        
+        # Process bridge information regardless of app service status
         update_tasks = [
             update_bridge_info(bridge_name, bridge_info)
             for bridge_name, bridge_info in bridges.items()
         ]
-        
-        # Use asyncio.gather with return_exceptions=True to prevent one failure from affecting others
         await asyncio.gather(*update_tasks, return_exceptions=True)
-        
+
         return templates.TemplateResponse("dashboard.html", {
             "request": request,
             "bridges": bridges,
@@ -434,15 +518,19 @@ async def dashboard(request: Request):
             "asmux_data": beeper_data.get("user", {}).get("asmuxData", {}),
             "user_info": beeper_data.get("userInfo", {}),
             "jwt_token": jwt_token,
-            "GITHUB_REPOS": GITHUB_REPOS
+            "GITHUB_REPOS": GITHUB_REPOS,
+            "app_services": app_services,
+            "server_time": server_time,
+            "time_precision": precision,
+            "domain": domain
         })
         
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"Error fetching Beeper data: {exc.response.status_code}")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch data"})
     except Exception as exc:
         logger.error(f"Unexpected error in dashboard: {str(exc)}")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "An unexpected error occurred"})
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error": "Failed to load dashboard"
+        })
 
 
 @app.post("/reset_password", response_class=HTMLResponse)
@@ -601,3 +689,399 @@ async def post_bridge_state(
         return HTMLResponse(content=f"Failed to post bridge state: {exc.response.text}", status_code=500)
 
     return HTMLResponse(content=f"Bridge state for {bridge_name} posted successfully")
+
+T = TypeVar('T')
+
+class FullRequest(Generic[T]):
+    method: str
+    url: str
+    response_json: T
+    max_attempts: int = 1
+
+class Registration(BaseModel):
+    """Matrix appservice registration data"""
+    id: str
+    url: str
+    as_token: str
+    hs_token: str
+    sender_localpart: str
+    namespaces: Dict[str, List[Dict[str, Any]]]
+    rate_limited: bool = False
+    protocols: List[str] = Field(default_factory=list)
+
+@dataclass
+class HungryAPIClient:
+    base_domain: str
+    username: str
+    access_token: str
+    _client: Optional[httpx.AsyncClient] = field(default=None, init=False)
+    
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._client:
+            await self._client.aclose()
+    
+    def get_base_url(self) -> str:
+        return f"https://matrix.{self.base_domain}/_hungryserv/{self.username}"
+    
+    def get_user_id(self) -> str:
+        return f"@{self.username}:{self.base_domain}"
+    
+    def build_url(self, path_parts: List[str]) -> str:
+        """Build URL similar to mautrix.Client.BuildURL"""
+        base = self.get_base_url()
+        path = "/".join(str(p) for p in path_parts if p)
+        return f"{base}/{path}"
+    
+    async def make_request(self, 
+        method: str, 
+        url: str, 
+        content: Optional[Dict] = None, 
+        response_model: Optional[Any] = None
+    ) -> Any:
+        """Make request with similar interface to mautrix.Client.MakeRequest"""
+        client = self._client or httpx.AsyncClient()
+        try:
+            response = await client.request(
+                method,
+                url,
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                json=content
+            )
+            response.raise_for_status()
+            if response_model and response.content:
+                return response_model.parse_raw(response.content)
+            return response.json() if response.content else None
+        finally:
+            if not self._client:
+                await client.aclose()
+    
+    async def make_full_request(self, request: FullRequest) -> Any:
+        """Similar to mautrix.Client.MakeFullRequest"""
+        attempts = 0
+        while attempts < request.max_attempts:
+            try:
+                return await self.make_request(
+                    request.method,
+                    request.url,
+                    response_model=request.response_json
+                )
+            except Exception as e:
+                attempts += 1
+                if attempts >= request.max_attempts:
+                    raise
+                await asyncio.sleep(1)
+    
+    # Update existing methods to use new request helpers
+    async def register_app_service(
+        self, 
+        bridge: str, 
+        address: str, 
+        push: bool = False, 
+        self_hosted: bool = False
+    ) -> Registration:
+        url = self.build_url(["_matrix", "asmux", "mxauth", "appservice", self.username, bridge])
+        return await self.make_request(
+            "PUT",
+            url,
+            content={"address": address, "push": push, "self_hosted": self_hosted},
+            response_model=Registration
+        )
+    
+    async def get_app_service(self, bridge: str) -> Registration:
+        url = self.build_url(["_matrix", "asmux", "mxauth", "appservice", self.username, bridge])
+        return await self.make_request("GET", url, response_model=Registration)
+    
+    async def delete_app_service(self, bridge: str) -> None:
+        url = self.build_url(["_matrix", "asmux", "mxauth", "appservice", self.username, bridge])
+        await self.make_request("DELETE", url)
+    
+    async def get_server_time(self) -> Tuple[datetime, timedelta]:
+        start = time.time()
+        url = self.build_url(["_matrix", "client", "unstable", "com.beeper.timesync"])
+        resp = await self.make_request("GET", url)
+        precision = timedelta(seconds=time.time() - start)
+        return datetime.fromtimestamp(resp["time_ms"] / 1000), precision
+
+@app.post("/api/appservice/{bridge}", response_model=Registration)
+async def register_app_service(
+    request: Request,
+    bridge: str,
+    address: str = Form(...),
+    push: bool = Form(False),
+    self_hosted: bool = Form(False)
+):
+    """Register a new app service for a bridge"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        whoami = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        whoami.raise_for_status()
+        user_data = whoami.json()
+        
+        domain, username = extract_domain_and_username(user_data)
+        async with HungryAPIClient(
+            base_domain=domain,
+            username=username,
+            access_token=access_token
+        ) as client:
+            try:
+                result = await client.register_app_service(bridge, address, push, self_hosted)
+                return result
+            except BeeperError as e:
+                logger.warning(f"App service registration failed: {e.message}")
+                return HTMLResponse(
+                    content=e.message,
+                    status_code=e.status_code
+                )
+        
+    except ValueError as e:
+        logger.error(f"Domain extraction failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error registering app service: {str(e)}")
+        if isinstance(e, httpx.HTTPStatusError):
+            return HTMLResponse(
+                content=f"Failed to register app service: {e.response.text}",
+                status_code=e.response.status_code
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/appservice/{bridge}")
+async def get_app_service(request: Request, bridge: str):
+    """Get app service details for a bridge"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        whoami = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        whoami.raise_for_status()
+        user_data = whoami.json()
+        
+        domain, username = extract_domain_and_username(user_data)
+        logger.debug(f"Using domain: {domain}, username: {username}")
+        
+        async with HungryAPIClient(
+            base_domain=domain,
+            username=username,
+            access_token=access_token
+        ) as client:
+            result = await client.get_app_service(bridge)
+            return result
+        
+    except ValueError as e:
+        logger.error(f"Domain extraction failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting app service: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/appservice/{bridge}")
+async def delete_app_service(request: Request, bridge: str):
+    """Delete an app service for a bridge"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        whoami = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        whoami.raise_for_status()
+        user_data = whoami.json()
+        
+        domain, username = extract_domain_and_username(user_data)
+        async with HungryAPIClient(
+            base_domain=domain,
+            username=username,
+            access_token=access_token
+        ) as client:
+            await client.delete_app_service(bridge)
+            return {"status": "success", "message": f"App service for bridge {bridge} deleted"}
+        
+    except ValueError as e:
+        logger.error(f"Domain extraction failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting app service: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/time/sync")
+async def get_server_time_sync(request: Request):
+    """Get server time and sync information"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        whoami = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        whoami.raise_for_status()
+        user_data = whoami.json()
+        
+        try:
+            domain, username = extract_domain_and_username(user_data)
+        except ValueError as e:
+            logger.error(f"Domain extraction failed: {str(e)}")
+            return {
+                "server_time": datetime.now().isoformat(),
+                "precision_ms": 0,
+                "local_time": datetime.now().isoformat(),
+                "error": "Could not determine server domain"
+            }
+        
+        async with HungryAPIClient(
+            base_domain=domain,
+            username=username,
+            access_token=access_token
+        ) as client:
+            server_time, precision = await client.get_server_time()
+            return {
+                "server_time": server_time.isoformat(),
+                "precision_ms": precision.total_seconds() * 1000,
+                "local_time": datetime.now().isoformat()
+            }
+    except Exception as e:
+        logger.error(f"Error getting server time: {str(e)}")
+        return {
+            "server_time": datetime.now().isoformat(),
+            "precision_ms": 0,
+            "local_time": datetime.now().isoformat(),
+            "error": str(e)
+        }
+
+class BridgeStateEvent(str, Enum):
+    RUNNING = "RUNNING"
+    STARTING = "STARTING"
+    BACKOFF = "BACKOFF"
+    UNAVAILABLE = "UNAVAILABLE"
+    AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR"
+    BRIDGE_NOT_RUNNING = "BRIDGE_NOT_RUNNING"
+    # ...add other states as needed...
+
+class BridgeState(BaseModel):
+    username: str
+    bridge: str
+    stateEvent: BridgeStateEvent
+    source: str
+    createdAt: datetime
+    reason: Optional[str]
+    info: Dict[str, Any] = Field(default_factory=dict)
+    isSelfHosted: bool
+    bridgeType: str
+
+class OtherVersion(BaseModel):
+    name: str
+    version: str
+
+class WhoamiBridge(BaseModel):
+    version: str
+    configHash: str
+    otherVersions: List[OtherVersion] = Field(default_factory=list)
+    bridgeState: BridgeState
+    remoteState: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+
+class WhoamiAsmuxData(BaseModel):
+    login_token: str
+    api_token: str = ""
+    id: str = ""
+
+class WhoamiUser(BaseModel):
+    bridges: Dict[str, WhoamiBridge] = Field(default_factory=dict)
+    hungryserv: Optional[WhoamiBridge]
+    asmuxData: WhoamiAsmuxData
+
+class WhoamiUserInfo(BaseModel):
+    createdAt: datetime
+    username: str
+    email: str
+    fullName: str
+    channel: str
+    isAdmin: bool = Field(alias="admin")
+    isUserBridgeChangesLocked: bool = Field(alias="bridgeChangesLocked")
+    isFree: bool = Field(alias="free")
+    deletedAt: Optional[datetime]
+    supportRoomId: str
+    useHungryserv: bool
+    bridgeClusterId: str
+    analyticsId: str
+    hungryUrl: str = Field(alias="fakeHungryURL")
+    hungryUrlDirect: str = Field(alias="hungryURL")
+
+class RespWhoami(BaseModel):
+    user: WhoamiUser
+    userInfo: WhoamiUserInfo
+
+@app.post("/api/bridge/{bridge_name}/state")
+async def post_bridge_state(
+    request: Request,
+    bridge_name: str,
+    state: BridgeState,
+):
+    """Post bridge state update"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        whoami = await client.get(
+            "https://api.beeper.com/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        whoami.raise_for_status()
+        user_data = whoami.json()
+        
+        domain, username = extract_domain_and_username(user_data)
+        
+        url = f"https://api.{domain}/bridgebox/{username}/bridge/{bridge_name}/bridge_state"
+        response = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=state.dict()
+        )
+        response.raise_for_status()
+        return {"status": "success"}
+        
+    except Exception as e:
+        logger.error(f"Error posting bridge state: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/whoami", response_model=RespWhoami)
+async def get_whoami(request: Request):
+    """Get whoami information"""
+    access_token, _ = retrieve_tokens_from_cookies(request)
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        client = app.state.httpx_client
+        domain, _ = extract_domain_and_username({"userInfo": {"hungryUrl": "https://matrix.beeper.com"}})
+        response = await client.get(
+            f"https://api.{domain}/whoami",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        response.raise_for_status()
+        return RespWhoami.parse_obj(response.json())
+    except Exception as e:
+        logger.error(f"Error getting whoami: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
