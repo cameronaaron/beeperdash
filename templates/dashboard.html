@@ -13,36 +13,149 @@
     <script src="https://unpkg.com/@popperjs/core@2/dist/umd/popper.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <style>
+        .version-info {
+            font-size: 0.9em;
+        }
+        .version-info code {
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .commit-info {
+            max-width: 250px;
+            word-wrap: break-word;
+        }
+        .links a {
+            color: #6c757d;
+        }
+        .links a:hover {
+            color: #0d6efd;
+        }
+        .remote-state {
+            font-size: 0.9em;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .remote-state pre {
+            margin: 5px 0;
+            white-space: pre-wrap;
+        }
+        .bridge-details {
+            font-size: 0.9em;
+        }
+        .bridge-meta {
+            font-size: 0.85em;
+        }
+        .remote-counts {
+            font-size: 0.85em;
+        }
+        .additional-info pre {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .connection-info {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .connection-info .details {
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        .profile-info, .additional-info {
+            background: rgba(255,255,255,0.5);
+            padding: 8px;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
 <div class="container">
-    <h2 class="mt-5">Beeper Dashboard</h2>
+    <div class="alert alert-warning mt-3" role="alert">
+        <h4 class="alert-heading">⚠️ Disclaimer</h4>
+        <p class="mb-0">
+            This dashboard was created by <strong>Cameron Aaron</strong> as an independent project and is 
+            <strong>NOT</strong> affiliated with, endorsed by, or supported by Beeper or Automatic.
+            Use at your own risk. This is unofficial software that interacts with Beeper's APIs.
+        </p>
+    </div>
+
+    <div class="text-center mb-4">
+        <h2 class="mt-3">Beeper Dashboard</h2>
+        <p class="text-muted">
+            Created by Cameron Aaron | Independent Project<br>
+            <small>Version 1.0 - Unofficial Dashboard</small>
+        </p>
+    </div>
+
     <h3>User Information</h3>
-    <p>This section displays detailed information about your Beeper account.</p>
-    <table class="table table-bordered">
-        <thead>
-            <tr><th>Field</th><th>Value</th></tr>
-        </thead>
-        <tbody>
-            <tr><td>Analytics ID</td><td>{{ user_info.analyticsId }}</td></tr>
-            <tr><td>Bridge Cluster ID</td><td>{{ user_info.bridgeClusterId }}</td></tr>
-            <tr><td>Channel</td><td>{{ user_info.channel }}</td></tr>
-            <tr><td>Created At</td><td>{{ user_info.createdAt }}</td></tr>
-            <tr><td>Full Name</td><td>{{ user_info.fullName }}</td></tr>
-            <tr><td>Email</td><td>{{ user_info.email }}</td></tr>
-            <tr><td>Is Admin</td><td>{{ user_info.isAdmin }}</td></tr>
-            <tr><td>Is Free</td><td>{{ user_info.isFree }}</td></tr>
-            <tr><td>Username</td><td>{{ user_info.username }}</td></tr>
-            <tr><td>Referral Code</td><td>{{ user_info.referralCode }}</td></tr>
-            <tr><td>Data Location</td><td>{{ user_info.dataLocation }}</td></tr>
-            <tr><td>Deactivated At</td><td>{{ user_info.deactivatedAt }}</td></tr>
-            <tr><td>Deleted At</td><td>{{ user_info.deletedAt }}</td></tr>
-            <tr><td>Hungry URL</td><td>{{ user_info.hungryUrl }}</td></tr>
-            <tr><td>Hungry URL Direct</td><td>{{ user_info.hungryUrlDirect }}</td></tr>
-            <tr><td>Is User Bridge Changes Locked</td><td>{{ user_info.isUserBridgeChangesLocked }}</td></tr>
-            <tr><td>Support Room ID</td><td>{{ user_info.supportRoomId }}</td></tr>
-        </tbody>
-    </table>
+    <div class="accordion mb-4" id="userAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#userInfo">
+                    Basic Information
+                </button>
+            </h2>
+            <div id="userInfo" class="accordion-collapse collapse show">
+                <div class="accordion-body">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr><td>Analytics ID</td><td>{{ user_info.analyticsId }}</td></tr>
+                            <tr><td>Bridge Cluster ID</td><td>{{ user_info.bridgeClusterId }}</td></tr>
+                            <tr><td>Channel</td><td>{{ user_info.channel }}</td></tr>
+                            <tr><td>Created At</td><td>{{ user_info.createdAt }}</td></tr>
+                            <tr><td>Full Name</td><td>{{ user_info.fullName }}</td></tr>
+                            <tr><td>Email</td><td>{{ user_info.email }}</td></tr>
+                            <tr><td>Is Admin</td><td>{{ user_info.isAdmin }}</td></tr>
+                            <tr><td>Is Free</td><td>{{ user_info.isFree }}</td></tr>
+                            <tr><td>Username</td><td>{{ user_info.username }}</td></tr>
+                            <tr><td>Referral Code</td><td>{{ user_info.referralCode }}</td></tr>
+                            <tr><td>Data Location</td><td>{{ user_info.dataLocation }}</td></tr>
+                            <tr><td>Deactivated At</td><td>{{ user_info.deactivatedAt }}</td></tr>
+                            <tr><td>Deleted At</td><td>{{ user_info.deletedAt }}</td></tr>
+                            <tr><td>Hungry URL</td><td>{{ user_info.hungryUrl }}</td></tr>
+                            <tr><td>Hungry URL Direct</td><td>{{ user_info.hungryUrlDirect }}</td></tr>
+                            <tr><td>Is User Bridge Changes Locked</td><td>{{ user_info.isUserBridgeChangesLocked }}</td></tr>
+                            <tr><td>Support Room ID</td><td>{{ user_info.supportRoomId }}</td></tr>
+                            <tr><td>Customer Lead Token</td><td>{{ user_info.customerLead.token }}</td></tr>
+                            <tr><td>First Name</td><td>{{ user_info.customerLead.firstName }}</td></tr>
+                            <tr><td>Last Name</td><td>{{ user_info.customerLead.lastName }}</td></tr>
+                            <tr><td>Phone Number</td><td>{{ user_info.customerLead.phoneNumber }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#subscriptionInfo">
+                    Subscription Details
+                </button>
+            </h2>
+            <div id="subscriptionInfo" class="accordion-collapse collapse">
+                <div class="accordion-body">
+                    {% if user_info.customerLead.reservedName.stripeSubscription %}
+                    {% set sub = user_info.customerLead.reservedName.stripeSubscription %}
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr><td>Created</td><td>{{ sub.createdAt }}</td></tr>
+                            <tr><td>State</td><td><span class="badge bg-{{ 'success' if sub.state == 'ACTIVE' else 'warning' }}">{{ sub.state }}</span></td></tr>
+                            <tr><td>Type</td><td>{{ sub.type }}</td></tr>
+                            <tr><td>Active Since</td><td>{{ sub.activeAt }}</td></tr>
+                            <tr><td>Next Billing</td><td>{{ sub.nextBillingDate }}</td></tr>
+                            <tr><td>Cancelled</td><td>{{ sub.cancelledAt or 'N/A' }}</td></tr>
+                            <tr><td>Reason</td><td>{{ sub.inactiveReason or 'N/A' }}</td></tr>
+                        </tbody>
+                    </table>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <h3>Bridges</h3>
     <p>This section provides an overview of all the bridges associated with your account.</p>
@@ -64,42 +177,161 @@
             <tr>
                 <td>{{ bridge_name }}</td>
                 <td>
-                    <strong>Bridge:</strong> {{ bridge_data.bridgeState.bridge }}<br>
-                    <strong>Created At:</strong> {{ bridge_data.bridgeState.createdAt }}<br>
-                    <strong>Is Self Hosted:</strong> {{ bridge_data.bridgeState.isSelfHosted }}<br>
-                    <strong>State Event:</strong> {{ bridge_data.bridgeState.stateEvent }}<br>
-                    <strong>Username:</strong> {{ bridge_data.bridgeState.username }}
+                    <div class="bridge-details">
+                        <strong>Bridge:</strong> {{ bridge_data.bridgeState.bridge }}<br>
+                        <strong>Created At:</strong> {{ bridge_data.bridgeState.createdAt }}<br>
+                        <strong>Is Self Hosted:</strong> {{ bridge_data.bridgeState.isSelfHosted }}<br>
+                        <strong>State Event:</strong> {{ bridge_data.bridgeState.stateEvent }}<br>
+                        <strong>Username:</strong> {{ bridge_data.bridgeState.username }}<br>
+                        <strong>Source:</strong> {{ bridge_data.bridgeState.source }}<br>
+                        <strong>Bridge Type:</strong> {{ bridge_data.bridgeState.bridgeType }}<br>
+                        {% if bridge_data.bridgeState.info %}
+                            <strong>Additional Info:</strong><br>
+                            <pre class="small">{{ bridge_data.bridgeState.info | tojson(indent=2) }}</pre>
+                        {% endif %}
+                    </div>
                 </td>
                 <td>{{ bridge_data.configHash }}</td>
                 <td>
-                    {% for remote_id, remote_info in bridge_data.remoteState.items() %}
-                        <strong>Remote ID:</strong> {{ remote_id }}<br>
-                        <strong>Has Error:</strong> {{ remote_info.has_error }}<br>
-                        <strong>Message:</strong> {{ remote_info.message }}<br>
-                        <strong>State Event:</strong> {{ remote_info.state_event }}<br>
-                        <strong>Timestamp:</strong> {{ remote_info.timestamp }}<br>
-                        <strong>Battery Low:</strong> {{ remote_info.battery_low }}<br>
-                        <strong>Browser Active:</strong> {{ remote_info.browser_active }}<br>
-                        <strong>Google Account Pairing:</strong> {{ remote_info.google_account_pairing }}<br>
-                        <strong>Mobile Data:</strong> {{ remote_info.mobile_data }}<br>
-                        <strong>Settings:</strong> {{ remote_info.settings }}<br>
-                        <strong>Sims:</strong> {{ remote_info.sims }}<br><br>
-                    {% endfor %}
+                    <div class="remote-state mb-3">
+                        {% for remote_id, remote_info in bridge_data.remoteState.items() %}
+                            <div class="connection-info">
+                                <h6>Connection: {{ remote_info.remote_name }}</h6>
+                                <div class="details">
+                                    <strong>ID:</strong> {{ remote_id }}<br>
+                                    <strong>Status:</strong> 
+                                    <span class="badge {% if remote_info.ok %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ remote_info.state_event }}
+                                    </span><br>
+                                    <strong>Last Update:</strong> 
+                                    <span class="timestamp" data-timestamp="{{ remote_info.timestamp }}">
+                                        {{ remote_info.timestamp }}
+                                    </span><br>
+                                    
+                                    {% if remote_info.remote_profile %}
+                                    <div class="profile-info mt-2">
+                                        <strong>Profile:</strong>
+                                        {% for key, value in remote_info.remote_profile.items() %}
+                                            <br>• {{ key }}: 
+                                            {% if key == 'avatar' %}
+                                                <a href="{{ value }}" target="_blank">View</a>
+                                            {% else %}
+                                                {{ value }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if remote_info.info %}
+                                    <div class="additional-info mt-2">
+                                        <strong>Additional Info:</strong>
+                                        {% for key, value in remote_info.info.items() %}
+                                            <br>• {{ key }}:
+                                            {% if value is mapping or value is sequence %}
+                                                <pre class="small">{{ value|tojson(indent=2) }}</pre>
+                                            {% else %}
+                                                {{ value }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if not loop.last %}<hr>{% endif %}
+                        {% endfor %}
+                    </div>
                 </td>
-                <td>{{ bridge_data.version.split(':')[-1].split('-')[0] if bridge_data.version else "Unknown" }}</td>
+                <td>
+                    {% if bridge_data.version %}
+                        <div class="version-info">
+                            <strong>Current Version:</strong><br>
+                            <code>{{ bridge_data.current_version }}</code>
+                            
+                            {% if bridge_data.version_details.version_tag %}
+                            <br><small class="text-muted">Tag: {{ bridge_data.version_details.version_tag }}</small>
+                            {% endif %}
+
+                            {% if bridge_data.current_commit_message %}
+                            <div class="commit-info mt-2">
+                                <strong>Commit Message:</strong><br>
+                                <small class="text-muted">{{ bridge_data.current_commit_message[:100] }}{% if bridge_data.current_commit_message|length > 100 %}...{% endif %}</small>
+                            </div>
+                            {% endif %}
+
+                            <div class="bridge-meta mt-2">
+                                <strong>Connection Info:</strong><br>
+                                <span class="badge {% if bridge_data.bridgeState.stateEvent == 'RUNNING' %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ bridge_data.bridgeState.stateEvent }}
+                                </span>
+                                <br>
+                                <small>Since: {{ bridge_data.bridgeState.createdAt.split('T')[0] }}</small>
+                            </div>
+
+                            <div class="remote-counts mt-2">
+                                <strong>Remote Connections:</strong><br>
+                                <small>Active: {{ bridge_data.remoteState|length }}</small>
+                            </div>
+
+                            {% if bridge_data.bridgeState.info %}
+                            <div class="additional-info mt-2">
+                                <strong>Bridge Info:</strong><br>
+                                <pre class="small">{{ bridge_data.bridgeState.info|tojson(indent=2) }}</pre>
+                            </div>
+                            {% endif %}
+
+                            <div class="links mt-2">
+                                <small>
+                                    <a href="{{ bridge_data.github_url }}" target="_blank" class="text-decoration-none">
+                                        📂 Repository
+                                    </a>
+                                    {% if bridge_data.compare_url and not bridge_data.is_up_to_date %}
+                                    <br>
+                                    <a href="{{ bridge_data.compare_url }}" target="_blank" class="text-decoration-none">
+                                        🔄 View Changes
+                                    </a>
+                                    {% endif %}
+                                </small>
+                            </div>
+
+                            <button class="btn btn-sm btn-link p-0 mt-1" onclick="showDetailedInfo('{{ bridge_name }}')">
+                                <small>📊 Detailed Info</small>
+                            </button>
+                        </div>
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </td>
                 <td>
                     {% if bridge_data.is_up_to_date is not none %}
                         {% if bridge_data.is_up_to_date %}
                             <span class="badge bg-success">Up-to-Date</span>
                         {% else %}
                             <span class="badge bg-danger">Out of Date</span>
+                            <br>
+                            <small>Latest: <code>{{ bridge_data.latest_version[:8] }}</code></small>
+                            <br>
+                            <small class="text-muted">{{ bridge_data.latest_commit_message[:50] }}...</small>
                         {% endif %}
                     {% else %}
                         <span class="badge bg-secondary">Unknown</span>
                     {% endif %}
                 </td>
-                <td>{{ bridge_data.current_commit_date }}</td>
-                <td>{{ bridge_data.latest_commit_date }}</td>
+                <td>
+                    {% if bridge_data.current_commit_date != "Unknown" %}
+                        {{ bridge_data.current_commit_date.split('T')[0] }}
+                        <br>
+                        <small class="text-muted">{{ bridge_data.current_commit_date.split('T')[1].split('Z')[0] }}</small>
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </td>
+                <td>
+                    {% if bridge_data.latest_commit_date != "Unknown" %}
+                        {{ bridge_data.latest_commit_date.split('T')[0] }}
+                        <br>
+                        <small class="text-muted">{{ bridge_data.latest_commit_date.split('T')[1].split('Z')[0] }}</small>
+                    {% endif %}
+                </td>
             </tr>
         {% endfor %}
         </tbody>
@@ -143,7 +375,7 @@
     </form>
 
     <h3>Start or Update Bridge</h3>
-    <form method="post" action="/start_or_update_bridge" onsubmit="setBridgeName()">
+    <form method="post" action="/start_or_update_bridge" onsubmit="setBridgeName(); return true;">
         <div class="mb-3">
             <label for="beeper_token" class="form-label">Beeper Token:</label>
             <input type="text" class="form-control" id="beeper_token" name="beeper_token" value="{{ token }}" required>
@@ -164,23 +396,42 @@
         <button type="submit" class="btn btn-primary">Start or Update Bridge</button>
     </form>
 
-    <!-- Modal -->
-    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Dashboard Information</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <footer class="mt-5 mb-3 text-center text-muted">
+        <hr>
+        <p>
+            Built by Cameron Aaron (2024)<br>
+            This is an unofficial tool. Not affiliated with Beeper/Automatic.<br>
+            Use at your own discretion.
+        </p>
+    </footer>
+</div>
+
+<!-- Update the info modal -->
+<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Important Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <h5>⚠️ Disclaimer</h5>
+                    <p>This is an unofficial dashboard created by Cameron Aaron. It is not affiliated with or endorsed by Beeper or Automatic.</p>
                 </div>
-                <div class="modal-body">
-                    This dashboard provides an overview of your Beeper account, bridges, and real-time updates.
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
+                <p>This dashboard provides an overview of your Beeper account, bridges, and real-time updates. Use at your own risk.</p>
+                <hr>
+                <small class="text-muted">
+                    Developer: Cameron Aaron<br>
+                    Independent Project - Not officially supported
+                </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
+</div>
 
 <script>
 function checkOtherBridge() {
@@ -202,6 +453,108 @@ function setBridgeName() {
         otherBridgeInput.name = '';
     }
 }
+
+function showVersionDetails(bridgeName) {
+    const bridge = {{ bridges|tojson|safe }}[bridgeName];
+    const versionDetails = `
+Bridge: ${bridgeName}
+Repository: ${bridge.repository}
+Current Version: ${bridge.current_version}
+Full Hash: ${bridge.version_details.full_hash}
+Docker Tag: ${bridge.version_details.docker_tag || 'N/A'}
+Version Tag: ${bridge.version_details.version_tag || 'N/A'}
+
+Bridge State:
+Type: ${bridge.bridgeState.bridgeType}
+Created: ${bridge.bridgeState.createdAt}
+State: ${bridge.bridgeState.stateEvent}
+Source: ${bridge.bridgeState.source}
+
+Current Commit:
+${bridge.current_commit_message}
+
+Latest Commit:
+${bridge.latest_commit_message}
+
+Current Date: ${bridge.current_commit_date}
+Latest Date: ${bridge.latest_commit_date}
+
+Config Hash: ${bridge.configHash}
+`;
+    alert(versionDetails);
+}
+
+function showDetailedInfo(bridgeName) {
+    const bridge = {{ bridges|tojson|safe }}[bridgeName];
+    let details = `
+Bridge Details for ${bridgeName}
+==============================
+Status: ${bridge.bridgeState.stateEvent}
+Type: ${bridge.bridgeState.bridgeType}
+Created: ${bridge.bridgeState.createdAt}
+Config Hash: ${bridge.configHash}
+
+Version Information
+-----------------
+Current: ${bridge.version}
+Latest: ${bridge.latest_version}
+Status: ${bridge.is_up_to_date ? '✅ Up to Date' : '⚠️ Update Available'}
+
+Remote Connections (${Object.keys(bridge.remoteState).length})
+-------------------
+${Object.entries(bridge.remoteState).map(([id, info]) => `
+${info.remote_name} (${id})
+• Status: ${info.state_event}
+• Last Update: ${formatTimestamp(info.timestamp)}
+• Profile: ${JSON.stringify(info.remote_profile || {}, null, 2)}
+• Settings: ${JSON.stringify(info.info || {}, null, 2)}
+`).join('\n')}
+
+Additional Details
+----------------
+Self Hosted: ${bridge.bridgeState.isSelfHosted}
+Source: ${bridge.bridgeState.source}
+Username: ${bridge.bridgeState.username}
+`;
+
+    // Create modal with formatted information
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="modal fade" id="detailModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${bridgeName} Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <pre style="white-space: pre-wrap;">${details}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal.querySelector('#detailModal'));
+    modalInstance.show();
+    modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+    });
+}
+
+function formatTimestamp(timestamp) {
+    return new Date(timestamp * 1000).toLocaleString();
+}
+
+// Format all timestamps on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.timestamp').forEach(function(element) {
+        const timestamp = parseInt(element.dataset.timestamp);
+        if (!isNaN(timestamp)) {
+            element.textContent = new Date(timestamp * 1000).toLocaleString();
+        }
+    });
+});
 </script>
 </body>
 </html>

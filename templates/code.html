@@ -16,6 +16,14 @@
 </head>
 <body>
 <div class="container">
+    <div class="alert alert-warning mt-3" role="alert">
+        <h4 class="alert-heading">⚠️ Security Notice</h4>
+        <p>
+            This is an unofficial dashboard created by Cameron Aaron.<br>
+            Not affiliated with Beeper or Automatic. Use at your own risk.
+        </p>
+    </div>
+
     <h2 class="mt-5">Enter the Challenge Code</h2>
     <form method="post" action="/token" novalidate class="needs-validation">
         <div class="mb-3">
@@ -28,6 +36,14 @@
         <input type="hidden" name="login_request" value="{{ login_request }}">
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
+
+    <footer class="mt-5 mb-3 text-center text-muted">
+        <hr>
+        <p>
+            Independent Project by Cameron Aaron<br>
+            Not affiliated with Beeper/Automatic
+        </p>
+    </footer>
 </div>
 
 <!-- Modal -->

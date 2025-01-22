@@ -1,8 +1,22 @@
-# Beeper Dashboard
+# Beeper Dashboard (Unofficial)
 
-## Project Overview
+Created by Cameron Aaron
 
-Beeper Dashboard is a web application that provides a user interface for managing and monitoring various bridges associated with a Beeper account. It allows users to view detailed information about their account, bridges, and perform actions such as resetting passwords, deleting bridges, and posting bridge states.
+⚠️ **IMPORTANT DISCLAIMER**
+- This is an **unofficial** dashboard for Beeper
+- Not affiliated with, endorsed by, or supported by Beeper or Automatic
+- Use at your own risk
+- This software interacts with Beeper's APIs independently
+
+## About
+A dashboard for monitoring and managing Beeper bridges, providing version tracking, status monitoring, and bridge management capabilities.
+
+## Features
+- Monitor bridge status and versions
+- Track version updates
+- Manage bridge configurations
+- View detailed bridge information
+- Check connection status
 
 ## Installation Instructions
 
@@ -74,3 +88,10 @@ We welcome contributions to the Beeper Dashboard project. To contribute, follow 
 6. Wait for the project maintainers to review your pull request. They may request changes or provide feedback.
 
 Thank you for contributing to the Beeper Dashboard project!
+
+## Author
+Cameron Aaron
+- GitHub: [@cameronaaron](https://github.com/cameronaaron)
+
+## License
+MIT License - See LICENSE file for details

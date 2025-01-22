@@ -1,12 +1,12 @@
-fastapi
-pydantic
+fastapi==0.109.2
+pydantic==2.6.1
 Jinja2
 orjson
 asyncio
 email-validator
-uvicorn
-httpx
-python-multipart
+uvicorn==0.27.1
+httpx==0.26.0
+python-multipart==0.0.7
 websockets
 pydantic[email]
 python-dotenv

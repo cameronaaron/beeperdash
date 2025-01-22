@@ -1,3 +1,15 @@
+"""
+Beeper Dashboard
+Created by Cameron Aaron
+
+DISCLAIMER:
+This is an unofficial dashboard that interacts with Beeper's APIs.
+Not affiliated with, endorsed by, or supported by Beeper or Automatic.
+Use at your own risk.
+
+Author: Cameron Aaron
+"""
+
 from fastapi import FastAPI, Request, Form, HTTPException, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -15,7 +27,15 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(
+    title="Unofficial Beeper Dashboard",
+    description="Created by Cameron Aaron. Not affiliated with Beeper/Automatic. Use at your own risk.",
+    version="1.0",
+    contact={
+        "name": "Cameron Aaron",
+        "url": "https://github.com/cameronaaron",  
+    },
+)
 templates = Jinja2Templates(directory="templates")
 
 # Create static directory if it doesn't exist
@@ -53,6 +73,7 @@ GITHUB_REPOS = {
     "heisenbridge": "hifi/heisenbridge",
 }
 
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 
 
 class LoginRequest(BaseModel):
@@ -114,28 +135,40 @@ async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
         return {
             "sha": commit_data.get("sha", "Unknown"),
             "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
-            "message": commit_data.get("commit", {}).get("message", "No commit message")
+            "message": commit_data.get("commit", {}).get("message", "No commit message"),
+            "branch": branch
         }
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"Error fetching commit data from {github_url}: {exc}")
-        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
+    except httpx.HTTPStatusError:
+        # Don't log 422 errors as they're expected when a branch doesn't exist
+        return {"sha": "Unknown", "date": "Unknown", "message": "Branch not found", "branch": branch}
     except Exception as exc:
         logger.error(f"Unexpected error fetching commit data from {github_url}: {exc}")
-        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
-
+        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data", "branch": branch}
 
 async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
     repo = GITHUB_REPOS.get(bridge_name, "")
     if not repo:
-        return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
+        return {"sha": "Unknown", "date": "Unknown", "message": "Unknown", "branch": "Unknown"}
 
-    # Try main or master branch
-    for branch in ["main", "master"]:
+    # Try branches in order of preference
+    for branch in ["main", "master", "dev", "develop"]:
         commit_data = await get_github_commit_data(repo, branch)
         if commit_data["sha"] != "Unknown":
             return commit_data
-    return {"sha": "Unknown", "date": "Unknown", "message": "Unknown"}
 
+    # If no branches worked, try to get default branch
+    try:
+        repo_url = f"https://api.github.com/repos/{repo}"
+        repo_data = await make_authenticated_request(repo_url)
+        default_branch = repo_data.get("default_branch")
+        if default_branch:
+            commit_data = await get_github_commit_data(repo, default_branch)
+            if commit_data["sha"] != "Unknown":
+                return commit_data
+    except:
+        pass
+
+    return {"sha": "Unknown", "date": "Unknown", "message": "No valid branch found", "branch": "Unknown"}
 
 async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]:
     # Clean up commit hash - remove any docker prefix and get only the hash part
@@ -153,32 +186,23 @@ async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]
     if len(commit_hash) > 40:
         commit_hash = commit_hash[:40]
     
-    github_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash}"
-    try:
-        commit_data = await make_authenticated_request(github_url)
-        return {
-            "sha": commit_data.get("sha", "Unknown"),
-            "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
-            "message": commit_data.get("commit", {}).get("message", "No commit message")
-        }
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"Error fetching commit data from {github_url}: {exc}")
-        # Try with shorter hash if initial request fails
-        if len(commit_hash) > 8:
-            try:
-                shorter_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash[:8]}"
-                commit_data = await make_authenticated_request(shorter_url)
-                return {
-                    "sha": commit_data.get("sha", "Unknown"),
-                    "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
-                    "message": commit_data.get("commit", {}).get("message", "No commit message")
-                }
-            except:
-                pass
-        return {"sha": commit_hash, "date": "Unknown", "message": "Error fetching commit data"}
-    except Exception as exc:
-        logger.error(f"Unexpected error fetching commit data from {github_url}: {exc}")
-        return {"sha": commit_hash, "date": "Unknown", "message": "Error fetching commit data"}
+    # Try full hash first, then abbreviated
+    for hash_version in [commit_hash, commit_hash[:8]]:
+        try:
+            github_url = f"https://api.github.com/repos/{repo}/commits/{hash_version}"
+            commit_data = await make_authenticated_request(github_url)
+            return {
+                "sha": commit_data.get("sha", "Unknown"),
+                "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
+                "message": commit_data.get("commit", {}).get("message", "No commit message")
+            }
+        except httpx.HTTPStatusError:
+            continue
+        except Exception as exc:
+            logger.error(f"Error fetching commit {hash_version}: {exc}")
+            continue
+
+    return {"sha": commit_hash, "date": "Unknown", "message": "Could not fetch commit data"}
 
 async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
     if bridge_name not in GITHUB_REPOS:
@@ -222,30 +246,44 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
         # Store the full version string for display
         bridge_info['full_version'] = version_string
         
-        # Get latest commit first
+        # Get latest commit first - now includes branch info
         latest_commit = await get_latest_github_commit_hash(bridge_name)
         
         # Get current commit info with cleaned hash
         current_commit = await get_commit_data_by_hash(GITHUB_REPOS[bridge_name], current_version)
 
-        # Compare versions more flexibly
-        is_up_to_date = False
-        if latest_commit["sha"] != "Unknown" and current_commit["sha"] != "Unknown":
-            is_up_to_date = (
-                current_commit["sha"].startswith(latest_commit["sha"]) or 
-                latest_commit["sha"].startswith(current_commit["sha"]) or
-                current_commit["sha"] == latest_commit["sha"]
-            )
-
         bridge_info.update({
-            'is_up_to_date': is_up_to_date,
+            'is_up_to_date': (
+                current_commit["sha"] != "Unknown" and 
+                latest_commit["sha"] != "Unknown" and
+                (current_commit["sha"].startswith(latest_commit["sha"]) or 
+                latest_commit["sha"].startswith(current_commit["sha"]) or
+                current_commit["sha"] == latest_commit["sha"])
+            ),
             'latest_commit_date': latest_commit["date"],
             'latest_version': latest_commit["sha"],
             'latest_commit_message': latest_commit["message"],
+            'latest_branch': latest_commit.get("branch", "Unknown"),
             'current_commit_date': current_commit["date"],
             'current_commit_message': current_commit["message"],
-            'current_version': current_version[:12] if current_version else "Unknown"
+            'current_version': current_version[:12] if current_version else "Unknown",
+            'repository': GITHUB_REPOS.get(bridge_name, "Unknown"),
+            'github_url': f"https://github.com/{GITHUB_REPOS.get(bridge_name, '')}",
+            'version_details': {
+                'full_hash': current_version,
+                'short_hash': current_version[:8] if current_version else "Unknown",
+                'docker_tag': version_string if 'docker.beeper-tools.com' in version_string else None,
+                'version_tag': parts[0] if 'docker.beeper-tools.com' in version_string and parts else None
+            }
         })
+
+        # Only add compare URL if we have valid versions and they're different
+        if (current_commit["sha"] != "Unknown" and latest_commit["sha"] != "Unknown" and 
+            current_commit["sha"] != latest_commit["sha"]):
+            bridge_info['compare_url'] = (
+                f"https://github.com/{GITHUB_REPOS.get(bridge_name, '')}/compare/"
+                f"{current_version}...{latest_commit['sha']}"
+            )
 
     except Exception as e:
         logger.error(f"Error updating bridge info for {bridge_name}: {str(e)}")
@@ -275,10 +313,17 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
+    """
+    Login page with disclaimer about unofficial status.
+    Created by Cameron Aaron - Not affiliated with Beeper.
+    """
     access_token, jwt_token = retrieve_tokens_from_cookies(request)
     if is_authenticated(access_token, jwt_token):
         return RedirectResponse(url="/dashboard", status_code=302)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "disclaimer": "This is an unofficial dashboard created by Cameron Aaron. Not affiliated with Beeper."
+    })
 
 
 @app.post("/login")
@@ -353,6 +398,11 @@ async def get_token(request: Request, code: str = Form(...), login_request: str 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
+    """
+    Main dashboard view.
+    DISCLAIMER: Unofficial tool created by Cameron Aaron.
+    Not affiliated with or endorsed by Beeper/Automatic.
+    """
     access_token, jwt_token = retrieve_tokens_from_cookies(request)
     if not is_authenticated(access_token, jwt_token):
         return RedirectResponse(url="/", status_code=302)
