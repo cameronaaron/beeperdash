@@ -6,7 +6,7 @@ asyncio
 email-validator
 uvicorn==0.27.1
 httpx==0.26.0
-python-multipart==0.0.7
+python-multipart==0.0.18
 websockets
 pydantic[email]
 python-dotenv
