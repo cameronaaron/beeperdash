@@ -217,19 +217,23 @@
             </h2>
             <div id="subscriptionInfo" class="accordion-collapse collapse">
                 <div class="accordion-body">
-                    {% if user_info.customerLead.reservedName.stripeSubscription %}
+                    {% if user_info.customerLead and user_info.customerLead.get('reservedName', {}).get('stripeSubscription') %}
                     {% set sub = user_info.customerLead.reservedName.stripeSubscription %}
                     <table class="table table-bordered">
                         <tbody>
-                            <tr><td>Created</td><td>{{ sub.createdAt }}</td></tr>
-                            <tr><td>State</td><td><span class="badge bg-{{ 'success' if sub.state == 'ACTIVE' else 'warning' }}">{{ sub.state }}</span></td></tr>
-                            <tr><td>Type</td><td>{{ sub.type }}</td></tr>
-                            <tr><td>Active Since</td><td>{{ sub.activeAt }}</td></tr>
-                            <tr><td>Next Billing</td><td>{{ sub.nextBillingDate }}</td></tr>
-                            <tr><td>Cancelled</td><td>{{ sub.cancelledAt or 'N/A' }}</td></tr>
-                            <tr><td>Reason</td><td>{{ sub.inactiveReason or 'N/A' }}</td></tr>
+                            <tr><td>Created</td><td>{{ sub.get('createdAt', 'N/A') }}</td></tr>
+                            <tr><td>State</td><td><span class="badge bg-{{ 'success' if sub.get('state') == 'ACTIVE' else 'warning' }}">{{ sub.get('state', 'UNKNOWN') }}</span></td></tr>
+                            <tr><td>Type</td><td>{{ sub.get('type', 'N/A') }}</td></tr>
+                            <tr><td>Active Since</td><td>{{ sub.get('activeAt', 'N/A') }}</td></tr>
+                            <tr><td>Next Billing</td><td>{{ sub.get('nextBillingDate', 'N/A') }}</td></tr>
+                            <tr><td>Cancelled</td><td>{{ sub.get('cancelledAt', 'N/A') }}</td></tr>
+                            <tr><td>Reason</td><td>{{ sub.get('inactiveReason', 'N/A') }}</td></tr>
                         </tbody>
                     </table>
+                    {% else %}
+                    <div class="alert alert-info">
+                        No subscription information available.
+                    </div>
                     {% endif %}
                 </div>
             </div>

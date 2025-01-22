@@ -473,15 +473,22 @@ async def dashboard(request: Request):
         beeper_response.raise_for_status()
         beeper_data = beeper_response.json()
         
+        # Ensure user_info exists and has necessary fields
+        user_info = beeper_data.get("userInfo", {})
+        if isinstance(user_info, dict):
+            # Convert any None values to empty dicts to prevent attribute access errors
+            user_info["customerLead"] = user_info.get("customerLead", {}) or {}
+            if "reservedName" not in user_info["customerLead"]:
+                user_info["customerLead"]["reservedName"] = {}
+        
         # Initialize variables
         bridges = beeper_data.get("user", {}).get("bridges", {})
         app_services = {}
         server_time = datetime.now()
         precision = timedelta(0)
         domain = None
-        
+
         try:
-            # Extract domain and initialize HungryAPI client
             domain, username = extract_domain_and_username(beeper_data)
             hungry_client = HungryAPIClient(
                 base_domain=domain,
@@ -489,7 +496,6 @@ async def dashboard(request: Request):
                 access_token=access_token
             )
             
-            # Get app services and time info
             server_time, precision = await hungry_client.get_server_time()
             
             for bridge_name in bridges.keys():
@@ -502,8 +508,8 @@ async def dashboard(request: Request):
                     
         except ValueError as e:
             logger.warning(f"Domain extraction failed: {str(e)}")
-        
-        # Process bridge information regardless of app service status
+
+        # Process bridge information
         update_tasks = [
             update_bridge_info(bridge_name, bridge_info)
             for bridge_name, bridge_info in bridges.items()
@@ -516,7 +522,7 @@ async def dashboard(request: Request):
             "beeper_data": beeper_data,
             "token": access_token,
             "asmux_data": beeper_data.get("user", {}).get("asmuxData", {}),
-            "user_info": beeper_data.get("userInfo", {}),
+            "user_info": user_info,
             "jwt_token": jwt_token,
             "GITHUB_REPOS": GITHUB_REPOS,
             "app_services": app_services,
