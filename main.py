@@ -53,7 +53,6 @@ GITHUB_REPOS = {
     "heisenbridge": "hifi/heisenbridge",
 }
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 
 class LoginRequest(BaseModel):
@@ -95,10 +94,17 @@ async def make_authenticated_request(url: str) -> Dict[str, Any]:
     headers = {}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, timeout=10.0)
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=5.0)  # reduced timeout
+            response.raise_for_status()
+            return response.json()
+    except (httpx.ConnectTimeout, httpx.ReadTimeout):
+        logger.error(f"Timeout while fetching data from {url}")
+        raise httpx.RequestError(f"Timeout while fetching data from {url}")
+    except Exception as e:
+        logger.error(f"Error fetching data from {url}: {str(e)}")
+        raise
 
 
 async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
@@ -112,6 +118,9 @@ async def get_github_commit_data(repo: str, branch: str) -> Dict[str, str]:
         }
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error fetching commit data from {github_url}: {exc}")
+        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
+    except Exception as exc:
+        logger.error(f"Unexpected error fetching commit data from {github_url}: {exc}")
         return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
 
 
@@ -129,6 +138,21 @@ async def get_latest_github_commit_hash(bridge_name: str) -> Dict[str, str]:
 
 
 async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]:
+    # Clean up commit hash - remove any docker prefix and get only the hash part
+    if 'docker.beeper-tools.com' in commit_hash:
+        parts = commit_hash.split(':')[-1].split('-')
+        for part in parts:
+            if len(part) > 8 and all(c.isalnum() for c in part):
+                commit_hash = part
+                break
+    
+    # Ensure we're only using the hash part
+    commit_hash = ''.join(c for c in commit_hash if c.isalnum())
+    
+    # Trim to standard git hash length if needed
+    if len(commit_hash) > 40:
+        commit_hash = commit_hash[:40]
+    
     github_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash}"
     try:
         commit_data = await make_authenticated_request(github_url)
@@ -139,12 +163,25 @@ async def get_commit_data_by_hash(repo: str, commit_hash: str) -> Dict[str, str]
         }
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error fetching commit data from {github_url}: {exc}")
-        return {"sha": "Unknown", "date": "Unknown", "message": "Error fetching commit data"}
-
+        # Try with shorter hash if initial request fails
+        if len(commit_hash) > 8:
+            try:
+                shorter_url = f"https://api.github.com/repos/{repo}/commits/{commit_hash[:8]}"
+                commit_data = await make_authenticated_request(shorter_url)
+                return {
+                    "sha": commit_data.get("sha", "Unknown"),
+                    "date": commit_data.get("commit", {}).get("committer", {}).get("date", "Unknown"),
+                    "message": commit_data.get("commit", {}).get("message", "No commit message")
+                }
+            except:
+                pass
+        return {"sha": commit_hash, "date": "Unknown", "message": "Error fetching commit data"}
+    except Exception as exc:
+        logger.error(f"Unexpected error fetching commit data from {github_url}: {exc}")
+        return {"sha": commit_hash, "date": "Unknown", "message": "Error fetching commit data"}
 
 async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
     if bridge_name not in GITHUB_REPOS:
-        logger.error(f"Bridge name {bridge_name} not found in GITHUB_REPOS")
         bridge_info.update({
             'is_up_to_date': None,
             'latest_commit_date': "Unknown",
@@ -155,36 +192,71 @@ async def update_bridge_info(bridge_name: str, bridge_info: Dict[str, Any]):
         })
         return
 
-    if 'version' in bridge_info and bridge_info['version']:
-        current_version = bridge_info['version'].split(':')[-1].split('-')[0]
-        latest_commit = await get_latest_github_commit_hash(bridge_name)
-        latest_version = latest_commit["sha"]
-        latest_date = latest_commit["date"]
-        latest_message = latest_commit["message"]
+    try:
+        if 'version' not in bridge_info or not bridge_info['version']:
+            raise ValueError("No version information available")
 
+        version_string = bridge_info['version']
+        current_version = None
+        
+        # Extract commit hash from version string
+        if 'docker.beeper-tools.com' in version_string:
+            parts = version_string.split(':')[-1].split('-')
+            for part in parts:
+                if len(part) > 8 and all(c.isalnum() for c in part):
+                    current_version = part
+                    break
+            if not current_version and len(parts) > 1:
+                current_version = parts[1]
+        else:
+            # Handle direct commit hash
+            clean_version = ''.join(c for c in version_string if c.isalnum())
+            if len(clean_version) >= 8:
+                current_version = clean_version
+            else:
+                current_version = version_string
+
+        if not current_version:
+            raise ValueError(f"Could not parse version from: {version_string}")
+
+        # Store the full version string for display
+        bridge_info['full_version'] = version_string
+        
+        # Get latest commit first
+        latest_commit = await get_latest_github_commit_hash(bridge_name)
+        
+        # Get current commit info with cleaned hash
         current_commit = await get_commit_data_by_hash(GITHUB_REPOS[bridge_name], current_version)
-        current_date = current_commit["date"]
-        current_message = current_commit["message"]
+
+        # Compare versions more flexibly
+        is_up_to_date = False
+        if latest_commit["sha"] != "Unknown" and current_commit["sha"] != "Unknown":
+            is_up_to_date = (
+                current_commit["sha"].startswith(latest_commit["sha"]) or 
+                latest_commit["sha"].startswith(current_commit["sha"]) or
+                current_commit["sha"] == latest_commit["sha"]
+            )
 
         bridge_info.update({
-            'is_up_to_date': (current_version == latest_version),
-            'latest_commit_date': latest_date,
-            'latest_version': latest_version,
-            'latest_commit_message': latest_message,
-            'current_commit_date': current_date,
-            'current_commit_message': current_message
+            'is_up_to_date': is_up_to_date,
+            'latest_commit_date': latest_commit["date"],
+            'latest_version': latest_commit["sha"],
+            'latest_commit_message': latest_commit["message"],
+            'current_commit_date': current_commit["date"],
+            'current_commit_message': current_commit["message"],
+            'current_version': current_version[:12] if current_version else "Unknown"
         })
 
-        logger.info(f"Bridge: {bridge_name}, Current: {current_version}, Latest: {latest_version}, Up-to-date: {bridge_info['is_up_to_date']}")
-
-    else:
+    except Exception as e:
+        logger.error(f"Error updating bridge info for {bridge_name}: {str(e)}")
         bridge_info.update({
             'is_up_to_date': None,
             'latest_commit_date': "Unknown",
             'latest_version': "Unknown",
             'latest_commit_message': "Unknown",
             'current_commit_date': "Unknown",
-            'current_commit_message': "Unknown"
+            'current_commit_message': "Unknown",
+            'current_version': version_string if 'version_string' in locals() else "Unknown"
         })
 
     # Process additional fields from JSON payload if present
@@ -285,41 +357,42 @@ async def dashboard(request: Request):
     if not is_authenticated(access_token, jwt_token):
         return RedirectResponse(url="/", status_code=302)
 
-    client = app.state.httpx_client
     try:
+        client = app.state.httpx_client
         beeper_response = await client.get(
             "https://api.beeper.com/whoami",
             headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10.0
+            timeout=5.0  # reduced timeout
         )
         beeper_response.raise_for_status()
+        beeper_data = beeper_response.json()
+        
+        bridges = beeper_data.get("user", {}).get("bridges", {})
+        update_tasks = [
+            update_bridge_info(bridge_name, bridge_info)
+            for bridge_name, bridge_info in bridges.items()
+        ]
+        
+        # Use asyncio.gather with return_exceptions=True to prevent one failure from affecting others
+        await asyncio.gather(*update_tasks, return_exceptions=True)
+        
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request,
+            "bridges": bridges,
+            "beeper_data": beeper_data,
+            "token": access_token,
+            "asmux_data": beeper_data.get("user", {}).get("asmuxData", {}),
+            "user_info": beeper_data.get("userInfo", {}),
+            "jwt_token": jwt_token,
+            "GITHUB_REPOS": GITHUB_REPOS
+        })
+        
     except httpx.HTTPStatusError as exc:
         logger.error(f"Error fetching Beeper data: {exc.response.status_code}")
         return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch data"})
-    except httpx.RequestError as exc:
-        logger.error(f"Request error: {exc}")
-        return templates.TemplateResponse("error.html", {"request": request, "error": "Failed to fetch data"})
-
-    beeper_data = beeper_response.json()
-    bridges = beeper_data.get("user", {}).get("bridges", {})
-    asmux_data = beeper_data.get("user", {}).get("asmuxData", {})
-    user_info = beeper_data.get("userInfo", {})
-
-    await asyncio.gather(*[
-        update_bridge_info(bridge_name, bridge_info)
-        for bridge_name, bridge_info in bridges.items()
-    ])
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "bridges": bridges,
-        "beeper_data": beeper_data,
-        "token": access_token,
-        "asmux_data": asmux_data,
-        "user_info": user_info,
-        "jwt_token": jwt_token,
-        "GITHUB_REPOS": GITHUB_REPOS
-    })
+    except Exception as exc:
+        logger.error(f"Unexpected error in dashboard: {str(exc)}")
+        return templates.TemplateResponse("error.html", {"request": request, "error": "An unexpected error occurred"})
 
 
 @app.post("/reset_password", response_class=HTMLResponse)
