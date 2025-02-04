@@ -4,7 +4,7 @@ Created by Cameron Aaron
 
 ⚠️ **IMPORTANT DISCLAIMER**
 - This is an **unofficial** dashboard for Beeper
-- Not affiliated with, endorsed by, or supported by Beeper or Automatic
+- Not affiliated with, endorsed by, or supported by Beeper or Automattic
 - Use at your own risk
 - This software interacts with Beeper's APIs independently
 
